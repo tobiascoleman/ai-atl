@@ -104,6 +104,25 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 		return err
 	}
 
+	// Next Gen Stats collection indexes
+	ngsIndexes := []mongo.IndexModel{
+		{
+			// Compound unique index: one stat entry per player per week per stat type
+			Keys:    bson.D{{"player_id", 1}, {"season", 1}, {"week", 1}, {"stat_type", 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{"player_id", 1}, {"season", 1}},
+		},
+		{
+			Keys: bson.D{{"stat_type", 1}, {"season", 1}},
+		},
+	}
+	_, err = db.Collection("next_gen_stats").Indexes().CreateMany(ctx, ngsIndexes)
+	if err != nil {
+		return err
+	}
+
 	// Users collection indexes
 	userIndexes := []mongo.IndexModel{
 		{

@@ -84,6 +84,7 @@ type LoadStats struct {
 	PlayersLoaded int
 	GamesLoaded   int
 	PlaysLoaded   int
+	NGSLoaded     int
 	StartTime     time.Time
 }
 
@@ -137,25 +138,25 @@ func main() {
 func (l *DataLoader) LoadAll(ctx context.Context) {
 	fmt.Println("\n📊 Phase 1: Loading Schedules & Teams")
 	fmt.Println(strings.Repeat("=", 50))
-	l.LoadSchedules(ctx)
-	l.LoadTeams(ctx)
+	//l.LoadSchedules(ctx)
+	//l.LoadTeams(ctx)
 
 	fmt.Println("\n📊 Phase 2: Loading Rosters (2020-2025)")
 	fmt.Println(strings.Repeat("=", 50))
-	l.LoadRosters(ctx, 2020, 2025)
+	//l.LoadRosters(ctx, 2020, 2025)
 
 	fmt.Println("\n📊 Phase 3: Loading Weekly Rosters for Injury Status (2024-2025)")
 	fmt.Println(strings.Repeat("=", 50))
-	l.LoadWeeklyRosters(ctx, 2024, 2025)
+	//l.LoadWeeklyRosters(ctx, 2024, 2025)
 
 	fmt.Println("\n📊 Phase 4: Loading Player Stats (2020-2025)")
 	fmt.Println(strings.Repeat("=", 50))
-	l.LoadPlayerStats(ctx, 2020, 2025)
+	//l.LoadPlayerStats(ctx, 2020, 2025)
 
 	fmt.Println("\n📊 Phase 5: Loading Play-by-Play Data (ALL 27 SEASONS!) 🏈")
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Println("This is the biggest dataset - will take 15-20 minutes")
-	l.LoadPlayByPlay(ctx, 1999, 2025)
+	//l.LoadPlayByPlay(ctx, 1999, 2025)
 
 	fmt.Println("\n📊 Phase 6: Loading Next Gen Stats (All Seasons)")
 	fmt.Println(strings.Repeat("=", 50))
@@ -403,14 +404,68 @@ func (l *DataLoader) LoadNextGenStats(ctx context.Context, startYear, endYear in
 		fmt.Printf("→ Loading NGS %s (all seasons)...\n", statName)
 
 		url := dataURLs[urlKey]
-		_, err := l.downloadFile(url, fmt.Sprintf("ngs_%s.parquet", statName))
+		data, err := l.downloadFile(url, fmt.Sprintf("ngs_%s.parquet", statName))
 		if err != nil {
 			log.Printf("⚠ NGS %s not available: %v", statName, err)
+			l.mu.Lock()
+			l.stats.Errors++
+			l.mu.Unlock()
 			continue
 		}
 
-		fmt.Printf("✓ Cached NGS %s (all years)\n", statName)
+		// Parse the NGS stats
+		stats, err := parquet.ParseNextGenStats(data, statName)
+		if err != nil {
+			log.Printf("⚠ Failed to parse NGS %s: %v", statName, err)
+			l.mu.Lock()
+			l.stats.Errors++
+			l.mu.Unlock()
+			continue
+		}
+		if len(stats) == 0 {
+			log.Printf("⚠ No NGS %s stats parsed", statName)
+			continue
+		}
+
+		// Insert into MongoDB
+		inserted := l.insertNGSStats(ctx, stats)
+
+		l.mu.Lock()
+		l.stats.NGSLoaded += inserted
+		l.mu.Unlock()
+
+		fmt.Printf("✓ Loaded %d NGS %s stats (all years)\n", inserted, statName)
 	}
+}
+
+func (l *DataLoader) insertNGSStats(ctx context.Context, stats []models.NextGenStat) int {
+	if len(stats) == 0 {
+		return 0
+	}
+
+	collection := l.db.Collection("next_gen_stats")
+
+	// Upsert stats with compound key (player_id + season + week + stat_type)
+	inserted := 0
+	for _, stat := range stats {
+		filter := bson.M{
+			"player_id": stat.PlayerID,
+			"season":    stat.Season,
+			"week":      stat.Week,
+			"stat_type": stat.StatType,
+		}
+		update := bson.M{"$set": stat}
+
+		opts := options.UpdateOne().SetUpsert(true)
+		_, err := collection.UpdateOne(ctx, filter, update, opts)
+		if err != nil {
+			log.Printf("Error upserting NGS stat: %v", err)
+			continue
+		}
+		inserted++
+	}
+
+	return inserted
 }
 
 // Helper functions
