@@ -5,7 +5,7 @@ import (
 
 	"github.com/ai-atl/nfl-platform/internal/services"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type ChatbotHandler struct {

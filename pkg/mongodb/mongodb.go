@@ -4,25 +4,32 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 // Connect establishes a connection to MongoDB
 func Connect(ctx context.Context, uri string) (*mongo.Client, error) {
+	// Use ServerAPI for MongoDB Atlas compatibility
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+
 	clientOptions := options.Client().
 		ApplyURI(uri).
+		SetServerAPIOptions(serverAPI).
 		SetMaxPoolSize(50).
 		SetMinPoolSize(10).
-		SetMaxConnIdleTime(30 * time.Second)
+		SetMaxConnIdleTime(30 * time.Second).
+		SetConnectTimeout(30 * time.Second).        // Longer timeout for initial connection
+		SetServerSelectionTimeout(30 * time.Second) // Longer timeout for Atlas
 
-	client, err := mongo.Connect(ctx, clientOptions)
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	// Ping the database to verify connection
-	if err := client.Ping(ctx, nil); err != nil {
+	if err := client.Ping(ctx, readpref.Primary()); err != nil {
 		return nil, err
 	}
 

@@ -8,9 +8,8 @@ import (
 
 	"github.com/ai-atl/nfl-platform/internal/models"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type VoteHandler struct {
@@ -24,7 +23,7 @@ func NewVoteHandler(db *mongo.Database) *VoteHandler {
 // Create creates a new vote
 func (h *VoteHandler) Create(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	objID, _ := primitive.ObjectIDFromHex(userID.(string))
+	objID, _ := bson.ObjectIDFromHex(userID.(string))
 
 	var vote models.Vote
 	if err := c.ShouldBindJSON(&vote); err != nil {
@@ -32,7 +31,7 @@ func (h *VoteHandler) Create(c *gin.Context) {
 		return
 	}
 
-	vote.ID = primitive.NewObjectID()
+	vote.ID = bson.NewObjectID()
 	vote.UserID = objID
 	vote.CreatedAt = time.Now()
 

@@ -3,11 +3,11 @@ package models
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Player struct {
-	ID       primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	ID       bson.ObjectID `json:"id" bson:"_id,omitempty"`
 	NFLID    string             `json:"nfl_id" bson:"nfl_id"`
 	Name     string             `json:"name" bson:"name"`
 	Team     string             `json:"team" bson:"team"`

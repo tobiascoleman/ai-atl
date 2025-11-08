@@ -8,9 +8,9 @@ import (
 
 	"github.com/ai-atl/nfl-platform/internal/models"
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func main() {
@@ -45,7 +45,7 @@ func main() {
 	log.Println("Loading sample players...")
 	players := []interface{}{
 		models.Player{
-			ID:          primitive.NewObjectID(),
+			ID:          bson.NewObjectID(),
 			NFLID:       "00-0033873",
 			Name:        "Patrick Mahomes",
 			Team:        "KC",
@@ -55,7 +55,7 @@ func main() {
 			UpdatedAt:   time.Now(),
 		},
 		models.Player{
-			ID:          primitive.NewObjectID(),
+			ID:          bson.NewObjectID(),
 			NFLID:       "00-0036355",
 			Name:        "Justin Jefferson",
 			Team:        "MIN",
@@ -66,7 +66,7 @@ func main() {
 			UpdatedAt:   time.Now(),
 		},
 		models.Player{
-			ID:          primitive.NewObjectID(),
+			ID:          bson.NewObjectID(),
 			NFLID:       "00-0035704",
 			Name:        "Christian McCaffrey",
 			Team:        "SF",
@@ -88,7 +88,7 @@ func main() {
 	// Load sample game
 	log.Println("Loading sample game...")
 	game := models.Game{
-		ID:        primitive.NewObjectID(),
+		ID:        bson.NewObjectID(),
 		GameID:    "2024_09_KC_BUF",
 		Season:    2024,
 		Week:      9,

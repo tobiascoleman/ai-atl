@@ -24,12 +24,12 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		MongoURI:     getEnv("MONGODB_URI", "mongodb://localhost:27017"),
+		MongoURI:     getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DBName:       getEnv("DB_NAME", "nfl_platform"),
 		JWTSecret:    getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 		RedisURL:     getEnv("REDIS_URL", "redis://localhost:6379"),
-		Environment:  getEnv("ENVIRONMENT", "development"),
+		Environment:  getEnv("ENV", "development"),
 		Port:         getEnv("PORT", "8080"),
 	}
 

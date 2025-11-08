@@ -3,11 +3,11 @@ package models
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type User struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	ID        bson.ObjectID `json:"id" bson:"_id,omitempty"`
 	Email     string             `json:"email" bson:"email"`
 	Username  string             `json:"username" bson:"username"`
 	Password  string             `json:"-" bson:"password"` // Password hash, never send in JSON

@@ -1,12 +1,12 @@
 package models
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Play represents a single play from NFLverse historical data
 type Play struct {
-	ID     primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	ID     bson.ObjectID `json:"id" bson:"_id,omitempty"`
 	PlayID string             `json:"play_id" bson:"play_id"`
 	GameID string             `json:"game_id" bson:"game_id"`
 	Season int                `json:"season" bson:"season"`

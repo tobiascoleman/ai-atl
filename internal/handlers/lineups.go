@@ -7,9 +7,8 @@ import (
 
 	"github.com/ai-atl/nfl-platform/internal/models"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type LineupHandler struct {
@@ -23,7 +22,7 @@ func NewLineupHandler(db *mongo.Database) *LineupHandler {
 // List returns all lineups for the authenticated user
 func (h *LineupHandler) List(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	objID, _ := primitive.ObjectIDFromHex(userID.(string))
+	objID, _ := bson.ObjectIDFromHex(userID.(string))
 
 	collection := h.db.Collection("lineups")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -48,7 +47,7 @@ func (h *LineupHandler) List(c *gin.Context) {
 // Create creates a new lineup
 func (h *LineupHandler) Create(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	objID, _ := primitive.ObjectIDFromHex(userID.(string))
+	objID, _ := bson.ObjectIDFromHex(userID.(string))
 
 	var lineup models.FantasyLineup
 	if err := c.ShouldBindJSON(&lineup); err != nil {
@@ -56,7 +55,7 @@ func (h *LineupHandler) Create(c *gin.Context) {
 		return
 	}
 
-	lineup.ID = primitive.NewObjectID()
+	lineup.ID = bson.NewObjectID()
 	lineup.UserID = objID
 	lineup.CreatedAt = time.Now()
 	lineup.UpdatedAt = time.Now()
@@ -77,7 +76,7 @@ func (h *LineupHandler) Create(c *gin.Context) {
 // Get returns a specific lineup
 func (h *LineupHandler) Get(c *gin.Context) {
 	id := c.Param("id")
-	objID, err := primitive.ObjectIDFromHex(id)
+	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lineup ID"})
 		return
@@ -100,7 +99,7 @@ func (h *LineupHandler) Get(c *gin.Context) {
 // Update updates an existing lineup
 func (h *LineupHandler) Update(c *gin.Context) {
 	id := c.Param("id")
-	objID, err := primitive.ObjectIDFromHex(id)
+	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lineup ID"})
 		return
@@ -130,7 +129,7 @@ func (h *LineupHandler) Update(c *gin.Context) {
 // Delete removes a lineup
 func (h *LineupHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
-	objID, err := primitive.ObjectIDFromHex(id)
+	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lineup ID"})
 		return

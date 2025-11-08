@@ -9,9 +9,8 @@ import (
 	"github.com/ai-atl/nfl-platform/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -69,7 +68,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Create user
 	user := models.User{
-		ID:        primitive.NewObjectID(),
+		ID:        bson.NewObjectID(),
 		Email:     req.Email,
 		Username:  req.Username,
 		Password:  string(hashedPassword),

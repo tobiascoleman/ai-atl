@@ -6,9 +6,8 @@ import (
 
 	"github.com/ai-atl/nfl-platform/internal/models"
 	"github.com/ai-atl/nfl-platform/pkg/gemini"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type ChatbotService struct {
@@ -26,7 +25,7 @@ func NewChatbotService(db *mongo.Database) *ChatbotService {
 // Ask handles a question from the user and returns an AI-generated response
 func (s *ChatbotService) Ask(ctx context.Context, userID string, question string) (string, error) {
 	// Get user's lineup context
-	objID, _ := primitive.ObjectIDFromHex(userID)
+	objID, _ := bson.ObjectIDFromHex(userID)
 	
 	var lineups []models.FantasyLineup
 	cursor, err := s.db.Collection("lineups").Find(ctx, bson.M{"user_id": objID})

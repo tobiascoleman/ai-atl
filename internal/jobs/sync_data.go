@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ai-atl/nfl-platform/pkg/nflverse"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // SyncNFLverseData syncs data from NFLverse to MongoDB

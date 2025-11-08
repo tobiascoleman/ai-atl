@@ -3,12 +3,12 @@ package models
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type FantasyLineup struct {
-	ID     primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	UserID primitive.ObjectID `json:"user_id" bson:"user_id"`
+	ID     bson.ObjectID `json:"id" bson:"_id,omitempty"`
+	UserID bson.ObjectID `json:"user_id" bson:"user_id"`
 
 	Week   int `json:"week" bson:"week"`
 	Season int `json:"season" bson:"season"`

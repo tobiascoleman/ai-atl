@@ -8,10 +8,9 @@ import (
 
 	"github.com/ai-atl/nfl-platform/internal/models"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type PlayerHandler struct {
@@ -86,7 +85,7 @@ func (h *PlayerHandler) Get(c *gin.Context) {
 	defer cancel()
 
 	id := c.Param("id")
-	objID, err := primitive.ObjectIDFromHex(id)
+	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		// Try finding by NFL ID instead
 		var player models.Player
@@ -119,7 +118,7 @@ func (h *PlayerHandler) GetStats(c *gin.Context) {
 	season, _ := strconv.Atoi(c.DefaultQuery("season", strconv.Itoa(time.Now().Year())))
 	week, _ := strconv.Atoi(c.Query("week"))
 
-	objID, err := primitive.ObjectIDFromHex(id)
+	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid player ID"})
 		return

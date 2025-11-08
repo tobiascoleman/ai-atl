@@ -12,7 +12,7 @@ import (
 	"github.com/ai-atl/nfl-platform/internal/middleware"
 	"github.com/ai-atl/nfl-platform/pkg/mongodb"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 var (
@@ -24,7 +24,7 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var err error
