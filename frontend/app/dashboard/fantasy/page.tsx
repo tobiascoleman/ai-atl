@@ -14,8 +14,10 @@ import {
   fetchESPNRoster,
   saveESPNCredentials,
   optimizeESPNLineup,
+  fetchFreeAgents,
   ESPNPlayer,
   ESPNCredentials,
+  FreeAgentPlayer,
 } from "@/lib/api/espn";
 import { FantasyStatusResponse, YahooTeam } from "@/types/api";
 
@@ -45,6 +47,9 @@ export default function FantasyPage() {
     team_id: 0,
     year: 2025,
   });
+  const [freeAgents, setFreeAgents] = useState<FreeAgentPlayer[]>([]);
+  const [selectedPosition, setSelectedPosition] = useState<string>("");
+  const [showFreeAgents, setShowFreeAgents] = useState(false);
 
   const connectedQuery = useMemo(
     () => searchParams?.get("connected"),
@@ -130,6 +135,22 @@ export default function FantasyPage() {
     } catch (err) {
       console.error(err);
       setEspnError("Failed to optimize lineup.");
+    } finally {
+      setEspnLoading(false);
+    }
+  };
+
+  const handleLoadFreeAgents = async (position?: string) => {
+    setEspnLoading(true);
+    setEspnError(null);
+    try {
+      const result = await fetchFreeAgents(position, 50);
+      setFreeAgents(result.players);
+      setShowFreeAgents(true);
+    } catch (err: any) {
+      console.error("Free agents error:", err);
+      const errorMsg = err?.response?.data?.error || err?.message || "Failed to load free agents.";
+      setEspnError(errorMsg);
     } finally {
       setEspnLoading(false);
     }
@@ -637,6 +658,101 @@ export default function FantasyPage() {
                           </div>
                         ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Free Agents Section */}
+            {!espnLoading && espnConnected && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Available Free Agents
+                  </h3>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={selectedPosition}
+                      onChange={(e) => setSelectedPosition(e.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                    >
+                      <option value="">All Positions</option>
+                      <option value="QB">QB</option>
+                      <option value="RB">RB</option>
+                      <option value="WR">WR</option>
+                      <option value="TE">TE</option>
+                      <option value="K">K</option>
+                      <option value="D/ST">D/ST</option>
+                    </select>
+                    <button
+                      onClick={() => handleLoadFreeAgents(selectedPosition || undefined)}
+                      disabled={espnLoading}
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-green-700 disabled:bg-green-300"
+                    >
+                      🔍 Search Free Agents
+                    </button>
+                  </div>
+                </div>
+
+                {showFreeAgents && freeAgents.length > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Showing top {freeAgents.length} available players
+                      {selectedPosition && ` at ${selectedPosition}`}
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
+                      {freeAgents.map((player, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-green-200 bg-green-50 p-3 hover:shadow-md transition"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900">
+                                  {player.name}
+                                </p>
+                                {player.injured && (
+                                  <span className="text-xs font-medium text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                    {player.injuryStatus || "INJ"}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {player.position} - {player.proTeam}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between pt-2 border-t border-green-200">
+                            <div className="text-center flex-1">
+                              <p className="text-xs text-gray-500">Projected</p>
+                              <p className="text-base font-bold text-green-700">
+                                {player.projectedPoints.toFixed(1)}
+                              </p>
+                            </div>
+                            <div className="text-center flex-1 border-l border-green-200">
+                              <p className="text-xs text-gray-500">% Owned</p>
+                              <p className="text-base font-bold text-gray-700">
+                                {player.percentOwned.toFixed(0)}%
+                              </p>
+                            </div>
+                            <div className="text-center flex-1 border-l border-green-200">
+                              <p className="text-xs text-gray-500">% Started</p>
+                              <p className="text-base font-bold text-gray-700">
+                                {player.percentStarted.toFixed(0)}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowFreeAgents(false)}
+                      className="mt-3 text-sm text-green-700 hover:text-green-900 underline"
+                    >
+                      Hide Free Agents
+                    </button>
                   </div>
                 )}
               </div>

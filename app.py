@@ -167,5 +167,65 @@ def optimize_lineup():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/espn/free-agents', methods=['GET'])
+def get_free_agents():
+    try:
+        league, team, error = get_league_and_team()
+        if error:
+            return jsonify({'error': error}), 404
+        
+        # Get query parameters
+        position = request.args.get('position', None)  # Filter by position (QB, RB, WR, TE, K, D/ST)
+        size = int(request.args.get('size', 50))  # Number of results (default 50)
+        
+        # Handle empty string as None
+        if position == '':
+            position = None
+        
+        current_week = league.current_week
+        
+        # Get free agents from the league
+        # ESPN API provides free_agents method
+        free_agents = league.free_agents(size=size, position=position)
+        
+        # Process free agent data
+        free_agent_data = []
+        for player in free_agents:
+            projected = 0
+            actual = 0
+            try:
+                if hasattr(player, 'stats') and current_week in player.stats:
+                    projected = player.stats[current_week].get('projected_points', 0)
+                    actual = player.stats[current_week].get('points', 0)
+                if projected == 0:
+                    projected = getattr(player, 'projected_avg_points', 0)
+                if actual == 0:
+                    actual = getattr(player, 'avg_points', 0)
+            except:
+                projected = getattr(player, 'projected_avg_points', 0)
+                actual = getattr(player, 'avg_points', 0)
+            
+            player_data = {
+                'name': player.name,
+                'position': player.position,
+                'proTeam': player.proTeam,
+                'projectedPoints': projected,
+                'points': actual,
+                'injured': getattr(player, 'injured', False),
+                'injuryStatus': getattr(player, 'injuryStatus', 'ACTIVE'),
+                'playerId': getattr(player, 'playerId', None),
+                'percentOwned': getattr(player, 'percent_owned', 0),
+                'percentStarted': getattr(player, 'percent_started', 0),
+            }
+            free_agent_data.append(player_data)
+        
+        return jsonify({
+            'players': free_agent_data,
+            'count': len(free_agent_data)
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(port=5002, debug=True)

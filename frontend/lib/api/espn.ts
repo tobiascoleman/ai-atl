@@ -61,3 +61,35 @@ export async function optimizeESPNLineup(): Promise<OptimizeLineupResponse> {
   const { data } = await apiClient.get<OptimizeLineupResponse>("/espn/optimize-lineup");
   return data;
 }
+
+export interface FreeAgentPlayer {
+  name: string;
+  position: string;
+  proTeam: string;
+  projectedPoints: number;
+  points: number;
+  injured: boolean;
+  injuryStatus: string | null;
+  playerId?: number;
+  percentOwned: number;
+  percentStarted: number;
+}
+
+export interface FreeAgentsResponse {
+  players: FreeAgentPlayer[];
+  count: number;
+}
+
+export async function fetchFreeAgents(
+  position?: string,
+  size: number = 50
+): Promise<FreeAgentsResponse> {
+  const params = new URLSearchParams();
+  if (position) params.append("position", position);
+  params.append("size", size.toString());
+  
+  const { data } = await apiClient.get<FreeAgentsResponse>(
+    `/espn/free-agents?${params.toString()}`
+  );
+  return data;
+}
