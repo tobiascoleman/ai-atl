@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	baseURL = "https://generativelanguage.googleapis.com/v1beta"
+	baseURL = "https://generativelanguage.googleapis.com/v1"
 )
 
 type Client struct {
@@ -60,7 +60,7 @@ func NewClient() *Client {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		model: "gemini-pro",
+		model: "gemini-2.5-flash",
 	}
 }
 
