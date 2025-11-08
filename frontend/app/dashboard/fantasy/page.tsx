@@ -13,6 +13,7 @@ import {
   fetchESPNStatus,
   fetchESPNRoster,
   saveESPNCredentials,
+  optimizeESPNLineup,
   ESPNPlayer,
   ESPNCredentials,
 } from "@/lib/api/espn";
@@ -33,6 +34,10 @@ export default function FantasyPage() {
   const [espnLoading, setEspnLoading] = useState(false);
   const [espnError, setEspnError] = useState<string | null>(null);
   const [showESPNForm, setShowESPNForm] = useState(false);
+  const [showOptimized, setShowOptimized] = useState(false);
+  const [optimizedLineup, setOptimizedLineup] = useState<ESPNPlayer[]>([]);
+  const [benchPlayers, setBenchPlayers] = useState<ESPNPlayer[]>([]);
+  const [totalProjected, setTotalProjected] = useState(0);
   const [espnCreds, setEspnCreds] = useState<ESPNCredentials>({
     espn_s2: "",
     espn_swid: "",
@@ -108,6 +113,23 @@ export default function FantasyPage() {
     } catch (err) {
       console.error(err);
       setEspnError("Failed to save ESPN credentials. Please check your input.");
+    } finally {
+      setEspnLoading(false);
+    }
+  };
+
+  const handleOptimizeLineup = async () => {
+    setEspnLoading(true);
+    setEspnError(null);
+    try {
+      const result = await optimizeESPNLineup();
+      setOptimizedLineup(result.optimalLineup);
+      setBenchPlayers(result.bench);
+      setTotalProjected(result.totalProjected);
+      setShowOptimized(true);
+    } catch (err) {
+      console.error(err);
+      setEspnError("Failed to optimize lineup.");
     } finally {
       setEspnLoading(false);
     }
@@ -418,14 +440,23 @@ export default function FantasyPage() {
               <p className="font-medium text-green-600">
                 ESPN account connected
               </p>
-              <button
-                onClick={loadESPNData}
-                disabled={espnLoading}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300"
-              >
-                <RefreshCcw size={14} />
-                Refresh
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleOptimizeLineup}
+                  disabled={espnLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-orange-700 disabled:bg-orange-300"
+                >
+                  🎯 Optimize Lineup
+                </button>
+                <button
+                  onClick={loadESPNData}
+                  disabled={espnLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300"
+                >
+                  <RefreshCcw size={14} />
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {espnLoading && (
@@ -438,16 +469,25 @@ export default function FantasyPage() {
               </p>
             )}
 
-            {!espnLoading && espnRoster.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">
-                  Your ESPN Roster ({espnRoster.length} players):
-                </p>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {espnRoster.map((player, idx) => (
+            {showOptimized && optimizedLineup.length > 0 && (
+              <div className="mb-6 rounded-lg bg-orange-50 border-2 border-orange-300 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-orange-900">
+                    🎯 Optimized Lineup
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-xs text-orange-600">Total Projected</p>
+                    <p className="text-2xl font-bold text-orange-900">
+                      {totalProjected.toFixed(1)}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                  {optimizedLineup.map((player, idx) => (
                     <div
                       key={idx}
-                      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+                      className="rounded-lg border-2 border-orange-300 bg-white p-3"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
@@ -465,28 +505,140 @@ export default function FantasyPage() {
                             {player.position} - {player.proTeam}
                           </p>
                         </div>
-                        <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded">
-                          {player.lineupSlot}
+                        <span className="text-xs font-bold text-orange-700 bg-orange-200 px-2 py-1 rounded">
+                          {player.recommendedSlot || player.lineupSlot}
                         </span>
                       </div>
                       
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                         <div className="text-center flex-1">
                           <p className="text-xs text-gray-500">Projected</p>
                           <p className="text-lg font-bold text-orange-600">
                             {player.projectedPoints.toFixed(1)}
                           </p>
                         </div>
-                        <div className="text-center flex-1 border-l border-gray-200">
-                          <p className="text-xs text-gray-500">Actual</p>
-                          <p className="text-lg font-bold text-gray-900">
-                            {player.points.toFixed(1)}
-                          </p>
-                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
+
+                {benchPlayers.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Bench ({benchPlayers.length} players):
+                    </p>
+                    <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
+                      {benchPlayers.map((player, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded border border-gray-300 bg-gray-50 p-2 text-xs"
+                        >
+                          <p className="font-medium text-gray-900">{player.name}</p>
+                          <p className="text-gray-600">{player.position} - {player.projectedPoints.toFixed(1)} pts</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowOptimized(false)}
+                  className="mt-3 text-sm text-orange-700 hover:text-orange-900 underline"
+                >
+                  Hide Optimized Lineup
+                </button>
+              </div>
+            )}
+
+            {!espnLoading && espnRoster.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-gray-700">
+                  Your Current ESPN Roster ({espnRoster.length} players):
+                </p>
+                
+                {/* Starters Section */}
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 mb-3">
+                    Starting Lineup:
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {espnRoster
+                      .filter((player) => player.lineupSlot !== "BE")
+                      .map((player, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900">
+                                  {player.name}
+                                </p>
+                                {player.injured && (
+                                  <span className="text-xs font-medium text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                    {player.injuryStatus || "INJ"}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {player.position} - {player.proTeam}
+                              </p>
+                            </div>
+                            <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                              {player.lineupSlot}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                            <div className="text-center flex-1">
+                              <p className="text-xs text-gray-500">Projected</p>
+                              <p className="text-lg font-bold text-orange-600">
+                                {player.projectedPoints.toFixed(1)}
+                              </p>
+                            </div>
+                            <div className="text-center flex-1 border-l border-gray-200">
+                              <p className="text-xs text-gray-500">Actual</p>
+                              <p className="text-lg font-bold text-gray-900">
+                                {player.points.toFixed(1)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Bench Section */}
+                {espnRoster.filter((player) => player.lineupSlot === "BE").length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">
+                      Bench ({espnRoster.filter((player) => player.lineupSlot === "BE").length} players):
+                    </p>
+                    <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
+                      {espnRoster
+                        .filter((player) => player.lineupSlot === "BE")
+                        .map((player, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded border border-gray-300 bg-gray-50 p-2 text-xs"
+                          >
+                            <div className="flex items-center gap-1 mb-1">
+                              <p className="font-medium text-gray-900">{player.name}</p>
+                              {player.injured && (
+                                <span className="text-xs font-medium text-red-600 bg-red-100 px-1 py-0.5 rounded">
+                                  {player.injuryStatus || "INJ"}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-600">
+                              {player.position} - {player.projectedPoints.toFixed(1)} pts
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

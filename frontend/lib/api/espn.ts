@@ -17,6 +17,9 @@ export interface ESPNPlayer {
   points: number;
   injured: boolean;
   injuryStatus?: string | null;
+  eligibleSlots?: string[];
+  recommendedSlot?: string;
+  playerId?: number;
 }
 
 export interface ESPNStatusResponse {
@@ -45,5 +48,16 @@ export async function fetchESPNStatus(): Promise<ESPNStatusResponse> {
 
 export async function fetchESPNRoster(): Promise<ESPNRosterResponse> {
   const { data } = await apiClient.get<ESPNRosterResponse>("/espn/roster");
+  return data;
+}
+
+export interface OptimizeLineupResponse {
+  optimalLineup: ESPNPlayer[];
+  bench: ESPNPlayer[];
+  totalProjected: number;
+}
+
+export async function optimizeESPNLineup(): Promise<OptimizeLineupResponse> {
+  const { data } = await apiClient.get<OptimizeLineupResponse>("/espn/optimize-lineup");
   return data;
 }

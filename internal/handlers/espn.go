@@ -33,14 +33,23 @@ type ESPNCredentials struct {
 }
 
 type ESPNPlayer struct {
-	Name            string  `json:"name"`
-	Position        string  `json:"position"`
-	ProTeam         string  `json:"proTeam"`
-	LineupSlot      string  `json:"lineupSlot"`
-	ProjectedPoints float64 `json:"projectedPoints"`
-	Points          float64 `json:"points"`
-	Injured         bool    `json:"injured"`
-	InjuryStatus    *string `json:"injuryStatus"`
+	Name            string   `json:"name"`
+	Position        string   `json:"position"`
+	ProTeam         string   `json:"proTeam"`
+	LineupSlot      string   `json:"lineupSlot"`
+	ProjectedPoints float64  `json:"projectedPoints"`
+	Points          float64  `json:"points"`
+	Injured         bool     `json:"injured"`
+	InjuryStatus    *string  `json:"injuryStatus"`
+	EligibleSlots   []string `json:"eligibleSlots,omitempty"`
+	RecommendedSlot string   `json:"recommendedSlot,omitempty"`
+	PlayerID        *int     `json:"playerId,omitempty"`
+}
+
+type OptimizeLineupResponse struct {
+	OptimalLineup  []ESPNPlayer `json:"optimalLineup"`
+	Bench          []ESPNPlayer `json:"bench"`
+	TotalProjected float64      `json:"totalProjected"`
 }
 
 type ESPNStatusResponse struct {
@@ -178,4 +187,58 @@ func (h *ESPNHandler) GetRoster(c *gin.Context) {
 		Connected: true,
 		Players:   players,
 	})
+}
+
+// OptimizeLineup gets the optimal lineup based on projected points
+func (h *ESPNHandler) OptimizeLineup(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	objectID, err := bson.ObjectIDFromHex(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	// Get user's ESPN credentials
+	var user models.User
+	err = h.db.Collection("users").FindOne(c.Request.Context(), bson.M{"_id": objectID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
+		return
+	}
+
+	if user.ESPNS2 == "" || user.ESPNSWID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ESPN credentials not configured"})
+		return
+	}
+
+	// Call Flask service to get optimized lineup
+	flaskURL := fmt.Sprintf("%s/api/espn/optimize-lineup", h.flaskServiceURL)
+	resp, err := http.Get(flaskURL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch optimized lineup from ESPN service"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "ESPN service returned error: " + string(body),
+		})
+		return
+	}
+
+	// Parse the optimize response
+	var optimized OptimizeLineupResponse
+	if err := json.NewDecoder(resp.Body).Decode(&optimized); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse optimization data"})
+		return
+	}
+
+	c.JSON(http.StatusOK, optimized)
 }
