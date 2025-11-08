@@ -13,19 +13,19 @@ import (
 )
 
 type ESPNHandler struct {
-	db             *mongo.Database
+	db              *mongo.Database
 	flaskServiceURL string
 }
 
 func NewESPNHandler(db *mongo.Database, flaskServiceURL string) *ESPNHandler {
 	return &ESPNHandler{
-		db:             db,
+		db:              db,
 		flaskServiceURL: flaskServiceURL,
 	}
 }
 
 type ESPNCredentials struct {
-	ESPNS2  string `json:"espn_s2" binding:"required"`
+	ESPNS2   string `json:"espn_s2" binding:"required"`
 	ESPNSWID string `json:"espn_swid" binding:"required"`
 	LeagueID int    `json:"league_id" binding:"required"`
 	TeamID   int    `json:"team_id" binding:"required"`
@@ -33,10 +33,14 @@ type ESPNCredentials struct {
 }
 
 type ESPNPlayer struct {
-	Name       string `json:"name"`
-	Position   string `json:"position"`
-	ProTeam    string `json:"proTeam"`
-	LineupSlot string `json:"lineupSlot"`
+	Name            string  `json:"name"`
+	Position        string  `json:"position"`
+	ProTeam         string  `json:"proTeam"`
+	LineupSlot      string  `json:"lineupSlot"`
+	ProjectedPoints float64 `json:"projectedPoints"`
+	Points          float64 `json:"points"`
+	Injured         bool    `json:"injured"`
+	InjuryStatus    *string `json:"injuryStatus"`
 }
 
 type ESPNStatusResponse struct {
