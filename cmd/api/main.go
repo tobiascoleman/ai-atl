@@ -94,6 +94,7 @@ func main() {
 				espn.POST("/credentials", espnHandler.SaveCredentials)
 				espn.GET("/status", espnHandler.GetStatus)
 				espn.GET("/roster", espnHandler.GetRoster)
+				espn.GET("/optimize-lineup", espnHandler.OptimizeLineup)
 			}
 
 			// Players
