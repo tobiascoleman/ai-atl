@@ -344,11 +344,11 @@ type AIStartSitRequest struct {
 }
 
 type AIStartSitResponse struct {
-	Recommendation string  `json:"recommendation"` // "A" or "B"
-	Confidence     int     `json:"confidence"`     // 0-100
-	Reasoning      string  `json:"reasoning"`
-	PlayerAName    string  `json:"playerAName"`
-	PlayerBName    string  `json:"playerBName"`
+	Recommendation string `json:"recommendation"` // "A" or "B"
+	Confidence     int    `json:"confidence"`     // 0-100
+	Reasoning      string `json:"reasoning"`
+	PlayerAName    string `json:"playerAName"`
+	PlayerBName    string `json:"playerBName"`
 }
 
 // GetAIStartSitAdvice provides AI-powered start/sit recommendations
@@ -367,7 +367,7 @@ func (h *ESPNHandler) GetAIStartSitAdvice(c *gin.Context) {
 
 	// Call Flask service to get AI recommendation
 	flaskURL := fmt.Sprintf("%s/api/espn/ai-start-sit", h.flaskServiceURL)
-	
+
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal request"})
