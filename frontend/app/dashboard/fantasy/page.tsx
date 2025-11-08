@@ -14,8 +14,12 @@ import {
   fetchESPNRoster,
   saveESPNCredentials,
   optimizeESPNLineup,
+  fetchFreeAgents,
+  getAIStartSitAdvice,
   ESPNPlayer,
   ESPNCredentials,
+  FreeAgentPlayer,
+  AIStartSitResponse,
 } from "@/lib/api/espn";
 import { FantasyStatusResponse, YahooTeam } from "@/types/api";
 
@@ -44,6 +48,15 @@ export default function FantasyPage() {
     league_id: 0,
     team_id: 0,
     year: 2025,
+  });
+  const [freeAgents, setFreeAgents] = useState<FreeAgentPlayer[]>([]);
+  const [selectedPosition, setSelectedPosition] = useState<string>("");
+  const [showFreeAgents, setShowFreeAgents] = useState(false);
+  const [aiAdvice, setAiAdvice] = useState<AIStartSitResponse | null>(null);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [comparingPlayers, setComparingPlayers] = useState<{playerA: ESPNPlayer | null, playerB: ESPNPlayer | null}>({
+    playerA: null,
+    playerB: null,
   });
 
   const connectedQuery = useMemo(
@@ -133,6 +146,60 @@ export default function FantasyPage() {
     } finally {
       setEspnLoading(false);
     }
+  };
+
+  const handleLoadFreeAgents = async (position?: string) => {
+    setEspnLoading(true);
+    setEspnError(null);
+    try {
+      const result = await fetchFreeAgents(position, 50);
+      setFreeAgents(result.players);
+      setShowFreeAgents(true);
+    } catch (err: any) {
+      console.error("Free agents error:", err);
+      const errorMsg = err?.response?.data?.error || err?.message || "Failed to load free agents.";
+      setEspnError(errorMsg);
+    } finally {
+      setEspnLoading(false);
+    }
+  };
+
+  const handleSelectPlayerForComparison = (player: ESPNPlayer) => {
+    if (!comparingPlayers.playerA) {
+      setComparingPlayers({ playerA: player, playerB: null });
+    } else if (!comparingPlayers.playerB) {
+      setComparingPlayers({ ...comparingPlayers, playerB: player });
+    } else {
+      // Reset and start over
+      setComparingPlayers({ playerA: player, playerB: null });
+    }
+  };
+
+  const handleGetAIAdvice = async () => {
+    if (!comparingPlayers.playerA || !comparingPlayers.playerB) {
+      setEspnError("Please select two players to compare");
+      return;
+    }
+
+    setEspnLoading(true);
+    setEspnError(null);
+    try {
+      const result = await getAIStartSitAdvice(comparingPlayers.playerA, comparingPlayers.playerB);
+      setAiAdvice(result);
+      setShowAIModal(true);
+    } catch (err: any) {
+      console.error("AI advice error:", err);
+      const errorMsg = err?.response?.data?.error || err?.message || "Failed to get AI recommendation.";
+      setEspnError(errorMsg);
+    } finally {
+      setEspnLoading(false);
+    }
+  };
+
+  const resetComparison = () => {
+    setComparingPlayers({ playerA: null, playerB: null });
+    setAiAdvice(null);
+    setShowAIModal(false);
   };
 
   useEffect(() => {
@@ -459,6 +526,95 @@ export default function FantasyPage() {
               </div>
             </div>
 
+            {/* AI Start/Sit Advisor */}
+            {(comparingPlayers.playerA || comparingPlayers.playerB) && (
+              <div className="mb-4 rounded-lg bg-purple-50 border-2 border-purple-300 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-purple-900">
+                    🤖 AI Start/Sit Advisor
+                  </h3>
+                  <button
+                    onClick={resetComparison}
+                    className="text-sm text-purple-700 hover:text-purple-900 underline"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className={`p-3 rounded border-2 ${comparingPlayers.playerA ? 'border-purple-500 bg-white' : 'border-dashed border-purple-300 bg-purple-100'}`}>
+                    {comparingPlayers.playerA ? (
+                      <div>
+                        <p className="font-semibold text-gray-900">{comparingPlayers.playerA.name}</p>
+                        <p className="text-sm text-gray-600">{comparingPlayers.playerA.position} - {comparingPlayers.playerA.proTeam}</p>
+                        <p className="text-sm text-purple-700">Proj: {comparingPlayers.playerA.projectedPoints.toFixed(1)} pts</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center">Select Player A</p>
+                    )}
+                  </div>
+                  <div className={`p-3 rounded border-2 ${comparingPlayers.playerB ? 'border-purple-500 bg-white' : 'border-dashed border-purple-300 bg-purple-100'}`}>
+                    {comparingPlayers.playerB ? (
+                      <div>
+                        <p className="font-semibold text-gray-900">{comparingPlayers.playerB.name}</p>
+                        <p className="text-sm text-gray-600">{comparingPlayers.playerB.position} - {comparingPlayers.playerB.proTeam}</p>
+                        <p className="text-sm text-purple-700">Proj: {comparingPlayers.playerB.projectedPoints.toFixed(1)} pts</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center">Select Player B</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleGetAIAdvice}
+                  disabled={!comparingPlayers.playerA || !comparingPlayers.playerB || espnLoading}
+                  className="w-full rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition hover:bg-purple-700 disabled:bg-purple-300"
+                >
+                  {espnLoading ? "Getting AI Recommendation..." : "Get AI Recommendation"}
+                </button>
+              </div>
+            )}
+
+            {/* AI Recommendation Modal */}
+            {showAIModal && aiAdvice && (
+              <div className="mb-4 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-400 p-6 shadow-lg">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-purple-900 mb-2">
+                      🤖 AI Recommendation
+                    </h3>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Start</p>
+                        <p className="text-2xl font-bold text-purple-700">
+                          {aiAdvice.recommendation === 'A' ? aiAdvice.playerAName : aiAdvice.playerBName}
+                        </p>
+                      </div>
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+                          style={{ width: `${aiAdvice.confidence}%` }}
+                        />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Confidence</p>
+                        <p className="text-2xl font-bold text-blue-700">{aiAdvice.confidence}%</p>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowAIModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-purple-200">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Reasoning:</p>
+                  <p className="text-gray-800">{aiAdvice.reasoning}</p>
+                </div>
+              </div>
+            )}
+
             {espnLoading && (
               <p className="text-sm text-gray-500">Loading your roster...</p>
             )}
@@ -604,6 +760,19 @@ export default function FantasyPage() {
                               </p>
                             </div>
                           </div>
+                          
+                          <button
+                            onClick={() => handleSelectPlayerForComparison(player)}
+                            className={`mt-2 w-full text-xs px-2 py-1 rounded transition ${
+                              comparingPlayers.playerA === player || comparingPlayers.playerB === player
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                            }`}
+                          >
+                            {comparingPlayers.playerA === player ? '✓ Player A' : 
+                             comparingPlayers.playerB === player ? '✓ Player B' : 
+                             '🤖 Compare'}
+                          </button>
                         </div>
                       ))}
                   </div>
@@ -612,31 +781,161 @@ export default function FantasyPage() {
                 {/* Bench Section */}
                 {espnRoster.filter((player) => player.lineupSlot === "BE").length > 0 && (
                   <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-2">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">
                       Bench ({espnRoster.filter((player) => player.lineupSlot === "BE").length} players):
                     </p>
-                    <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                       {espnRoster
                         .filter((player) => player.lineupSlot === "BE")
                         .map((player, idx) => (
                           <div
                             key={idx}
-                            className="rounded border border-gray-300 bg-gray-50 p-2 text-xs"
+                            className="rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm hover:shadow-md transition"
                           >
-                            <div className="flex items-center gap-1 mb-1">
-                              <p className="font-medium text-gray-900">{player.name}</p>
-                              {player.injured && (
-                                <span className="text-xs font-medium text-red-600 bg-red-100 px-1 py-0.5 rounded">
-                                  {player.injuryStatus || "INJ"}
-                                </span>
-                              )}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-gray-900">{player.name}</p>
+                                  {player.injured && (
+                                    <span className="text-xs font-medium text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                      {player.injuryStatus || "INJ"}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  {player.position} - {player.proTeam}
+                                </p>
+                              </div>
+                              <span className="text-xs font-medium text-gray-600 bg-gray-200 px-2 py-1 rounded">
+                                BE
+                              </span>
                             </div>
-                            <p className="text-gray-600">
-                              {player.position} - {player.projectedPoints.toFixed(1)} pts
-                            </p>
+                            
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                              <div className="text-center flex-1">
+                                <p className="text-xs text-gray-500">Projected</p>
+                                <p className="text-lg font-bold text-orange-600">
+                                  {player.projectedPoints.toFixed(1)}
+                                </p>
+                              </div>
+                              <div className="text-center flex-1 border-l border-gray-200">
+                                <p className="text-xs text-gray-500">Actual</p>
+                                <p className="text-lg font-bold text-gray-900">
+                                  {player.points.toFixed(1)}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <button
+                              onClick={() => handleSelectPlayerForComparison(player)}
+                              className={`mt-2 w-full text-xs px-2 py-1 rounded transition ${
+                                comparingPlayers.playerA === player || comparingPlayers.playerB === player
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                              }`}
+                            >
+                              {comparingPlayers.playerA === player ? '✓ Player A' : 
+                               comparingPlayers.playerB === player ? '✓ Player B' : 
+                               '🤖 Compare'}
+                            </button>
                           </div>
                         ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Free Agents Section */}
+            {!espnLoading && espnConnected && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Available Free Agents
+                  </h3>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={selectedPosition}
+                      onChange={(e) => setSelectedPosition(e.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                    >
+                      <option value="">All Positions</option>
+                      <option value="QB">QB</option>
+                      <option value="RB">RB</option>
+                      <option value="WR">WR</option>
+                      <option value="TE">TE</option>
+                      <option value="K">K</option>
+                      <option value="D/ST">D/ST</option>
+                    </select>
+                    <button
+                      onClick={() => handleLoadFreeAgents(selectedPosition || undefined)}
+                      disabled={espnLoading}
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-green-700 disabled:bg-green-300"
+                    >
+                      🔍 Search Free Agents
+                    </button>
+                  </div>
+                </div>
+
+                {showFreeAgents && freeAgents.length > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Showing top {freeAgents.length} available players
+                      {selectedPosition && ` at ${selectedPosition}`}
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
+                      {freeAgents.map((player, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-green-200 bg-green-50 p-3 hover:shadow-md transition"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900">
+                                  {player.name}
+                                </p>
+                                {player.injured && (
+                                  <span className="text-xs font-medium text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                    {player.injuryStatus || "INJ"}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {player.position} - {player.proTeam}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between pt-2 border-t border-green-200">
+                            <div className="text-center flex-1">
+                              <p className="text-xs text-gray-500">Projected</p>
+                              <p className="text-base font-bold text-green-700">
+                                {player.projectedPoints.toFixed(1)}
+                              </p>
+                            </div>
+                            <div className="text-center flex-1 border-l border-green-200">
+                              <p className="text-xs text-gray-500">% Owned</p>
+                              <p className="text-base font-bold text-gray-700">
+                                {player.percentOwned.toFixed(0)}%
+                              </p>
+                            </div>
+                            <div className="text-center flex-1 border-l border-green-200">
+                              <p className="text-xs text-gray-500">% Started</p>
+                              <p className="text-base font-bold text-gray-700">
+                                {player.percentStarted.toFixed(0)}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowFreeAgents(false)}
+                      className="mt-3 text-sm text-green-700 hover:text-green-900 underline"
+                    >
+                      Hide Free Agents
+                    </button>
                   </div>
                 )}
               </div>
