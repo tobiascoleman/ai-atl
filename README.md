@@ -12,6 +12,7 @@ An NFL fantasy platform that predicts **HOW games will unfold** using AI, not ju
 2. **EPA-Based Analysis** - Uses Expected Points Added metrics to find undervalued players
 3. **Context-Aware Chatbot** - Fantasy advice based on your actual lineup and league settings
 4. **Injury Impact Predictor** - Quantifies how injuries affect backup player opportunities
+5. **Yahoo Fantasy Sync (PoC)** - Securely link your Yahoo account to preview active NFL fantasy teams
 
 ## 🏗️ Tech Stack
 
@@ -52,9 +53,12 @@ go run cmd/api/main.go
 
 The API will be available at `http://localhost:8080`
 
+> 🔐 **Yahoo Fantasy OAuth**: add `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URL`, and `CLIENT_APP_URL` to your `.env` to enable the new fantasy integration. See `ENV_SETUP.md` for full instructions.
+
 ### API Endpoints
 
 #### Authentication
+
 ```bash
 # Register
 curl -X POST http://localhost:8080/api/v1/auth/register \
@@ -68,6 +72,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 ```
 
 #### AI Features (require auth token)
+
 ```bash
 # Game Script Prediction
 curl -X GET "http://localhost:8080/api/v1/insights/game_script?game_id=123" \
@@ -84,6 +89,10 @@ curl -X POST http://localhost:8080/api/v1/trades/analyze \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"team_a_gives":["player1"],"team_a_gets":["player2"],"team_b_gives":["player2"],"team_b_gets":["player1"]}'
+
+# Fantasy Teams (Yahoo OAuth required)
+curl -X GET http://localhost:8080/api/v1/fantasy/teams \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ## 📁 Project Structure
@@ -155,18 +164,21 @@ Bot: "Based on your roster and this week's matchups, I recommend Player X.
 ## 🏗️ Architecture Decisions
 
 ### Why Go?
+
 - Fast compilation for rapid iteration
 - Excellent concurrency for handling multiple AI requests
 - Simple deployment (single binary)
 - Strong MongoDB driver support
 
 ### Why MongoDB?
+
 - Flexible schema for NFLverse data
 - Embedded documents for player stats
 - Fast queries with proper indexing
 - Easy to scale
 
 ### Why Gemini?
+
 - Cost-effective (~$0.001 per request)
 - Good at structured reasoning
 - Fast response times

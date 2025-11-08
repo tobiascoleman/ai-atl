@@ -8,6 +8,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	go.mongodb.org/mongo-driver/v2 v2.4.0
 	golang.org/x/crypto v0.33.0
+	golang.org/x/oauth2 v0.33.0
 )
 
 require (

@@ -1,44 +1,45 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { useAuthStore } from '@/lib/stores/authStore'
-import { 
-  LayoutDashboard, 
-  Brain, 
-  MessageSquare, 
-  TrendingUp, 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuthStore } from "@/lib/stores/authStore";
+import {
+  LayoutDashboard,
+  Brain,
+  MessageSquare,
+  TrendingUp,
   Users,
-  LogOut 
-} from 'lucide-react'
+  LogOut,
+  Trophy,
+} from "lucide-react";
 
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const router = useRouter()
-  const { isAuthenticated, user, logout, hydrate } = useAuthStore()
+  const router = useRouter();
+  const { isAuthenticated, user, logout, hydrate } = useAuthStore();
 
   useEffect(() => {
-    hydrate()
-  }, [hydrate])
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login')
+      router.push("/login");
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, router]);
 
   if (!isAuthenticated) {
-    return null
+    return null;
   }
 
   const handleLogout = () => {
-    logout()
-    router.push('/')
-  }
+    logout();
+    router.push("/");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -47,7 +48,10 @@ export default function DashboardLayout({
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="text-2xl font-bold text-blue-600">
+              <Link
+                href="/dashboard"
+                className="text-2xl font-bold text-blue-600"
+              >
                 AI-ATL NFL
               </Link>
             </div>
@@ -74,26 +78,57 @@ export default function DashboardLayout({
           <aside className="w-64 flex-shrink-0">
             <nav className="bg-white rounded-xl shadow-sm p-4 sticky top-24">
               <ul className="space-y-2">
-                <NavItem href="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-                <NavItem href="/dashboard/insights" icon={<Brain size={20} />} label="AI Insights" />
-                <NavItem href="/dashboard/chat" icon={<MessageSquare size={20} />} label="AI Chat" />
-                <NavItem href="/dashboard/players" icon={<Users size={20} />} label="Players" />
-                <NavItem href="/dashboard/trades" icon={<TrendingUp size={20} />} label="Trade Analyzer" />
+                <NavItem
+                  href="/dashboard"
+                  icon={<LayoutDashboard size={20} />}
+                  label="Dashboard"
+                />
+                <NavItem
+                  href="/dashboard/insights"
+                  icon={<Brain size={20} />}
+                  label="AI Insights"
+                />
+                <NavItem
+                  href="/dashboard/chat"
+                  icon={<MessageSquare size={20} />}
+                  label="AI Chat"
+                />
+                <NavItem
+                  href="/dashboard/fantasy"
+                  icon={<Trophy size={20} />}
+                  label="Fantasy"
+                />
+                <NavItem
+                  href="/dashboard/players"
+                  icon={<Users size={20} />}
+                  label="Players"
+                />
+                <NavItem
+                  href="/dashboard/trades"
+                  icon={<TrendingUp size={20} />}
+                  label="Trade Analyzer"
+                />
               </ul>
             </nav>
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1">
-            {children}
-          </main>
+          <main className="flex-1">{children}</main>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function NavItem({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function NavItem({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+}) {
   return (
     <li>
       <Link
@@ -104,6 +139,5 @@ function NavItem({ href, icon, label }: { href: string; icon: React.ReactNode; l
         <span className="font-medium">{label}</span>
       </Link>
     </li>
-  )
+  );
 }
-
