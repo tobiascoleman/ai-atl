@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Send, Bot, User } from 'lucide-react'
 import { chatbotAPI } from '@/lib/api/chatbot'
 import { ChatMessage } from '@/types/api'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -100,8 +102,30 @@ export default function ChatPage() {
                     <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <Bot size={16} className="text-purple-600" />
                     </div>
-                    <div className="bg-gray-100 rounded-lg px-4 py-2 max-w-[70%]">
-                      <p className="whitespace-pre-wrap">{msg.response}</p>
+                    <div className="bg-gray-100 rounded-lg px-4 py-2 max-w-[70%] prose prose-sm max-w-none">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // Style markdown elements
+                          h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 text-gray-900" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-2 text-gray-900" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-base font-bold mb-1 text-gray-900" {...props} />,
+                          p: ({node, ...props}) => <p className="mb-2 text-gray-800" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
+                          li: ({node, ...props}) => <li className="text-gray-800" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-bold text-gray-900" {...props} />,
+                          em: ({node, ...props}) => <em className="italic" {...props} />,
+                          code: ({node, inline, ...props}: any) => 
+                            inline ? (
+                              <code className="bg-gray-200 px-1 py-0.5 rounded text-sm font-mono" {...props} />
+                            ) : (
+                              <code className="block bg-gray-200 p-2 rounded text-sm font-mono overflow-x-auto" {...props} />
+                            ),
+                        }}
+                      >
+                        {msg.response}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 )}
@@ -132,7 +156,7 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about your lineup, matchups, waiver targets..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               disabled={loading}
             />
             <button

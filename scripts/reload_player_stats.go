@@ -63,16 +63,16 @@ func main() {
 	totalInserted := 0
 	for year := startYear; year <= endYear; year++ {
 		log.Printf("\n📥 Loading player_stats for %d...", year)
-		
-		url := fmt.Sprintf("%s/player_stats/player_stats_regpost_%d.parquet", nflverseBaseURL, year)
-		
+
+		url := fmt.Sprintf("%s/stats_player/stats_player_regpost_%d.parquet", nflverseBaseURL, year)
+
 		// Download
 		resp, err := http.Get(url)
 		if err != nil {
 			log.Printf("   ⚠️  Failed to download: %v", err)
 			continue
 		}
-		
+
 		if resp.StatusCode != 200 {
 			log.Printf("   ⚠️  HTTP %d (data may not exist for this year)", resp.StatusCode)
 			resp.Body.Close()
@@ -148,4 +148,3 @@ func main() {
 	log.Println()
 	log.Println("🚀 Restart your backend and the player modal will show correct data!")
 }
-

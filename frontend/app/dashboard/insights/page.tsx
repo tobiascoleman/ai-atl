@@ -44,7 +44,7 @@ export default function InsightsPage() {
             value={gameId}
             onChange={(e) => setGameId(e.target.value)}
             placeholder="Enter game ID (e.g., 2024_09_KC_BUF)"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
           />
           <button
             onClick={handlePredict}
