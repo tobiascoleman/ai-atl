@@ -47,6 +47,7 @@ func main() {
 	db := mongoClient.Database(cfg.DBName)
 	yahooService := services.NewYahooService(db, cfg)
 	fantasyHandler := handlers.NewFantasyHandler(cfg, yahooService)
+	espnHandler := handlers.NewESPNHandler(db, "http://localhost:5002")
 
 	// Middleware
 	router.Use(middleware.CORS())
@@ -85,6 +86,14 @@ func main() {
 				fantasy.GET("/status", fantasyHandler.Status)
 				fantasy.GET("/oauth/url", fantasyHandler.GetAuthURL)
 				fantasy.GET("/teams", fantasyHandler.Teams)
+			}
+
+			// ESPN Fantasy routes
+			espn := protected.Group("/espn")
+			{
+				espn.POST("/credentials", espnHandler.SaveCredentials)
+				espn.GET("/status", espnHandler.GetStatus)
+				espn.GET("/roster", espnHandler.GetRoster)
 			}
 
 			// Players
