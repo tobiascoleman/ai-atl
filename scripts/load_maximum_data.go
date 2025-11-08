@@ -631,7 +631,7 @@ func (l *DataLoader) parseWeeklyRoster(data []byte, season int) []models.WeeklyR
 
 	for i := 0; i < numRows; i++ {
 		entry := models.WeeklyRosterEntry{
-			NFLID:                 getString("player_id", i),
+			NFLID:                 getString("gsis_id", i), // Use gsis_id, not player_id!
 			Season:                season,
 			Week:                  getInt("week", i),
 			Team:                  getString("team", i),
