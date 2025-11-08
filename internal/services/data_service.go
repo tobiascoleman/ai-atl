@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/ai-atl/nfl-platform/internal/models"
@@ -25,11 +26,22 @@ func NewDataService(db *mongo.Database) *DataService {
 
 // GetPlayer retrieves a player by NFL ID and season
 func (s *DataService) GetPlayer(ctx context.Context, nflID string, season int) (*models.Player, error) {
-	var player models.Player
-	err := s.db.Collection("players").FindOne(ctx, bson.M{
+	filter := bson.M{
 		"nfl_id": nflID,
 		"season": season,
-	}).Decode(&player)
+	}
+
+	log.Printf("🔍 GetPlayer query: %+v", filter)
+
+	var player models.Player
+	err := s.db.Collection("players").FindOne(ctx, filter).Decode(&player)
+
+	if err != nil {
+		log.Printf("❌ GetPlayer error: %v (nfl_id=%s, season=%d)", err, nflID, season)
+	} else {
+		log.Printf("✅ GetPlayer found: %s (%s, %d)", player.Name, player.Team, player.Season)
+	}
+
 	return &player, err
 }
 
@@ -374,29 +386,104 @@ func (s *DataService) GetUpcomingGames(ctx context.Context, team string) ([]mode
 // AGGREGATE QUERIES
 // ========================================
 
-// GetPlayerSummary gets comprehensive player data
+// GetPlayerSummary gets comprehensive player data for ALL seasons
 func (s *DataService) GetPlayerSummary(ctx context.Context, nflID string, season int) (map[string]interface{}, error) {
 	summary := make(map[string]interface{})
 
-	// Get player info
-	player, err := s.GetPlayer(ctx, nflID, season)
-	if err != nil {
+	// Get player info for requested season (or most recent if season=0)
+	var player *models.Player
+	var err error
+
+	if season > 0 {
+		player, err = s.GetPlayer(ctx, nflID, season)
+	} else {
+		// Get most recent season
+		cursor, err := s.db.Collection("players").Find(
+			ctx,
+			bson.M{"nfl_id": nflID},
+			options.Find().SetSort(bson.D{{Key: "season", Value: -1}}).SetLimit(1),
+		)
+		if err == nil {
+			var players []models.Player
+			cursor.All(ctx, &players)
+			if len(players) > 0 {
+				player = &players[0]
+			}
+			cursor.Close(ctx)
+		}
+	}
+
+	if player == nil {
 		return nil, err
 	}
+
 	summary["player"] = player
 
-	// Get stats
-	stats, _ := s.GetPlayerStats(ctx, nflID, season)
-	summary["stats"] = stats
+	// Get ALL seasons for this player
+	allSeasonsCursor, _ := s.db.Collection("players").Find(
+		ctx,
+		bson.M{"nfl_id": nflID},
+		options.Find().SetSort(bson.D{{Key: "season", Value: -1}}),
+	)
+	var allSeasons []models.Player
+	if allSeasonsCursor != nil {
+		allSeasonsCursor.All(ctx, &allSeasons)
+		allSeasonsCursor.Close(ctx)
+	}
+	summary["all_seasons"] = allSeasons
 
-	// Get EPA
-	epa, playCount, _ := s.CalculatePlayerEPA(ctx, nflID, season)
+	// Get ALL stats (all seasons)
+	allStats, _ := s.GetPlayerStats(ctx, nflID, 0) // 0 = all seasons
+	summary["all_stats"] = allStats
+
+	// Get current season stats
+	currentStats, _ := s.GetPlayerStats(ctx, nflID, player.Season)
+	summary["stats"] = currentStats
+
+	// Get EPA from player_stats (pre-calculated, much faster!)
+	currentSeasonStat := currentStats
+	var epa float64
+	var playCount int
+	if len(currentSeasonStat) > 0 {
+		epa = currentSeasonStat[0].EPA
+		playCount = currentSeasonStat[0].PlayCount
+	}
 	summary["epa"] = epa
 	summary["play_count"] = playCount
 
-	// Get NGS stats
-	ngs, _ := s.GetPlayerNGS(ctx, nflID, "", season)
+	// Build EPA by season map from all_stats (already have EPA pre-calculated)
+	epaBySeasonMap := make(map[int]map[string]interface{})
+	var lifetimeEPASum float64
+	var lifetimePlaysSum int
+
+	for _, stat := range allStats {
+		if stat.PlayCount > 0 {
+			epaBySeasonMap[stat.Season] = map[string]interface{}{
+				"epa":        stat.EPA,
+				"play_count": stat.PlayCount,
+			}
+			lifetimeEPASum += stat.EPA * float64(stat.PlayCount) // Weight by play count
+			lifetimePlaysSum += stat.PlayCount
+		}
+	}
+
+	// Calculate lifetime average EPA
+	var lifetimeEPA float64
+	if lifetimePlaysSum > 0 {
+		lifetimeEPA = lifetimeEPASum / float64(lifetimePlaysSum)
+	}
+
+	summary["epa_by_season"] = epaBySeasonMap
+	summary["lifetime_epa"] = lifetimeEPA
+	summary["lifetime_plays"] = lifetimePlaysSum
+
+	// Get NGS stats for current season
+	ngs, _ := s.GetPlayerNGS(ctx, nflID, "", player.Season)
 	summary["ngs"] = ngs
+
+	// Get ALL NGS stats (all seasons)
+	allNGS, _ := s.GetPlayerNGS(ctx, nflID, "", 0) // 0 = all seasons
+	summary["all_ngs"] = allNGS
 
 	return summary, nil
 }

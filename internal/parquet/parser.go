@@ -256,9 +256,15 @@ func ParsePlayerStats(data []byte, season int, seasonType string) ([]models.Play
 
 	schema := table.Schema()
 	colMap := make(map[string]int)
+
+	// Debug: Print all available columns (first time only)
+	fmt.Printf("📋 Available columns in player_stats (season %d): ", season)
+	columnNames := make([]string, 0, len(schema.Fields()))
 	for i, field := range schema.Fields() {
 		colMap[field.Name] = i
+		columnNames = append(columnNames, field.Name)
 	}
+	fmt.Printf("%v\n", columnNames)
 
 	getChunkAndOffset := func(col *arrow.Column, rowIdx int) (arrow.Array, int) {
 		offset := rowIdx
@@ -304,26 +310,82 @@ func ParsePlayerStats(data []byte, season int, seasonType string) ([]models.Play
 		return 0
 	}
 
+	getFloat := func(colName string, rowIdx int) float64 {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				switch arr := chunk.(type) {
+				case *array.Float64:
+					if !arr.IsNull(offset) {
+						return arr.Value(offset)
+					}
+				case *array.Float32:
+					if !arr.IsNull(offset) {
+						return float64(arr.Value(offset))
+					}
+				}
+			}
+		}
+		return 0.0
+	}
+
 	for i := 0; i < numRows; i++ {
+		// Calculate combined EPA from passing, rushing, and receiving EPA
+		passingEPA := getFloat("passing_epa", i)
+		rushingEPA := getFloat("rushing_epa", i)
+		receivingEPA := getFloat("receiving_epa", i)
+
+		// Sum non-zero EPAs
+		combinedEPA := passingEPA + rushingEPA + receivingEPA
+
+		// Count how many plays were involved (for averaging)
+		playCount := 0
+		if passingEPA != 0 {
+			playCount += getInt("attempts", i) // Passing attempts
+		}
+		if rushingEPA != 0 {
+			playCount += getInt("carries", i) // Rushing carries
+		}
+		if receivingEPA != 0 {
+			playCount += getInt("targets", i) // Receiving targets
+		}
+
 		playerStats := models.PlayerStats{
 			NFLID:      getString("player_id", i),
 			Season:     season,
 			SeasonType: seasonType,
 
-			// Passing stats
+			// Offensive Stats (CORRECTED COLUMN NAMES)
 			PassingYards:  getInt("passing_yards", i),
 			PassingTDs:    getInt("passing_tds", i),
-			Interceptions: getInt("interceptions", i),
+			Interceptions: getInt("passing_interceptions", i), // FIXED: was "interceptions"
 
-			// Rushing stats
 			RushingYards: getInt("rushing_yards", i),
 			RushingTDs:   getInt("rushing_tds", i),
 
-			// Receiving stats
 			Receptions:     getInt("receptions", i),
 			ReceivingYards: getInt("receiving_yards", i),
 			ReceivingTDs:   getInt("receiving_tds", i),
 			Targets:        getInt("targets", i),
+
+			// Defensive Stats (CORRECTED COLUMN NAMES)
+			Tackles:          getInt("def_tackles_with_assist", i), // FIXED: was "def_tackles_combined"
+			TacklesSolo:      getInt("def_tackles_solo", i),
+			TacklesAssist:    getInt("def_tackle_assists", i), // Already correct
+			TacklesForLoss:   getFloat("def_tackles_for_loss", i),
+			Sacks:            getFloat("def_sacks", i),
+			SackYards:        getFloat("def_sack_yards", i),
+			DefInterceptions: getInt("def_interceptions", i),
+			PassDefended:     getInt("def_pass_defended", i), // FIXED: was "def_passes_defended"
+			ForcedFumbles:    getInt("def_fumbles_forced", i),
+			FumbleRecoveries: getInt("fumble_recovery_opp", i), // FIXED: was "def_fumbles_recovered"
+			DefensiveTDs:     getInt("def_tds", i),
+			SafetyMD:         getInt("def_safeties", i), // FIXED: was "def_safety"
+
+			// Performance Metrics (from parquet file)
+			EPA:       combinedEPA,
+			PlayCount: playCount,
 
 			UpdatedAt: time.Now(),
 		}

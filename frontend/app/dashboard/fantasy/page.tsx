@@ -409,7 +409,7 @@ export default function FantasyPage() {
                   onChange={(e) =>
                     setEspnCreds({ ...espnCreds, espn_s2: e.target.value })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
                   placeholder="Long cookie string..."
                 />
               </div>
@@ -424,7 +424,7 @@ export default function FantasyPage() {
                   onChange={(e) =>
                     setEspnCreds({ ...espnCreds, espn_swid: e.target.value })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
                   placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
                 />
               </div>
@@ -443,7 +443,7 @@ export default function FantasyPage() {
                         league_id: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
                   />
                 </div>
 
@@ -460,7 +460,7 @@ export default function FantasyPage() {
                         team_id: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
                   />
                 </div>
 
@@ -477,7 +477,7 @@ export default function FantasyPage() {
                         year: parseInt(e.target.value) || 2025,
                       })
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
                   />
                 </div>
               </div>
@@ -857,7 +857,7 @@ export default function FantasyPage() {
                     <select
                       value={selectedPosition}
                       onChange={(e) => setSelectedPosition(e.target.value)}
-                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900"
                     >
                       <option value="">All Positions</option>
                       <option value="QB">QB</option>

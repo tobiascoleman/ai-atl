@@ -1,9 +1,29 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Brain, TrendingUp, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
+import { statsAPI, DashboardStats } from '@/lib/api/stats'
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await statsAPI.getDashboardStats()
+        setStats(data)
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
   return (
     <div className="space-y-6">
       <div>
@@ -45,24 +65,37 @@ export default function DashboardPage() {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard
-          title="AI Predictions Made"
-          value="1,234"
-          change="+12%"
-          positive
-        />
-        <StatCard
-          title="Accuracy Rate"
-          value="78.5%"
-          change="+5.2%"
-          positive
-        />
-        <StatCard
-          title="Fantasy Points Gained"
-          value="342"
-          change="+23%"
-          positive
-        />
+        {loading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : stats ? (
+          <>
+            <StatCard
+              title="Total Players"
+              value={stats.total_players.toLocaleString()}
+              subtitle={`${stats.current_season_year} Season`}
+            />
+            <StatCard
+              title="Plays Analyzed"
+              value={stats.total_plays.toLocaleString()}
+              subtitle={`${stats.total_games.toLocaleString()} Games`}
+            />
+            <StatCard
+              title="Next Gen Stats"
+              value={stats.next_gen_stats.toLocaleString()}
+              subtitle={`${stats.injured_players} Injured Players`}
+            />
+          </>
+        ) : (
+          <>
+            <StatCard title="Total Players" value="0" subtitle="No data" />
+            <StatCard title="Plays Analyzed" value="0" subtitle="No data" />
+            <StatCard title="Next Gen Stats" value="0" subtitle="No data" />
+          </>
+        )}
       </div>
 
       {/* Recent Activity */}
@@ -117,21 +150,27 @@ function QuickActionCard({
 function StatCard({
   title,
   value,
-  change,
-  positive,
+  subtitle,
 }: {
   title: string
   value: string
-  change: string
-  positive: boolean
+  subtitle: string
 }) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <p className="text-gray-600 text-sm mb-2">{title}</p>
       <p className="text-3xl font-bold text-gray-900 mb-2">{value}</p>
-      <p className={`text-sm ${positive ? 'text-green-600' : 'text-red-600'}`}>
-        {change} from last week
-      </p>
+      <p className="text-sm text-gray-500">{subtitle}</p>
+    </div>
+  )
+}
+
+function StatCardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+      <div className="h-8 bg-gray-200 rounded w-32 mb-2"></div>
+      <div className="h-4 bg-gray-200 rounded w-20"></div>
     </div>
   )
 }

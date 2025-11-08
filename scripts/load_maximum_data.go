@@ -151,7 +151,7 @@ func (l *DataLoader) LoadAll(ctx context.Context) {
 
 	fmt.Println("\n📊 Phase 4: Loading Player Stats (2020-2025)")
 	fmt.Println(strings.Repeat("=", 50))
-	//l.LoadPlayerStats(ctx, 2020, 2025)
+	l.LoadPlayerStats(ctx, 2020, 2025)
 
 	fmt.Println("\n📊 Phase 5: Loading Play-by-Play Data (ALL 27 SEASONS!) 🏈")
 	fmt.Println(strings.Repeat("=", 50))
@@ -160,7 +160,7 @@ func (l *DataLoader) LoadAll(ctx context.Context) {
 
 	fmt.Println("\n📊 Phase 6: Loading Next Gen Stats (All Seasons)")
 	fmt.Println(strings.Repeat("=", 50))
-	l.LoadNextGenStats(ctx, 2020, 2025)
+	//l.LoadNextGenStats(ctx, 2020, 2025)
 
 	fmt.Println("\n✅ All data loaded!")
 }

@@ -56,7 +56,7 @@ export default function TradesPage() {
                 value={teamAGives}
                 onChange={(e) => setTeamAGives(e.target.value)}
                 placeholder="Player IDs, comma separated"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
             </div>
             <div>
@@ -68,7 +68,7 @@ export default function TradesPage() {
                 value={teamAGets}
                 onChange={(e) => setTeamAGets(e.target.value)}
                 placeholder="Player IDs, comma separated"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
             </div>
           </div>
@@ -85,7 +85,7 @@ export default function TradesPage() {
                 value={teamBGives}
                 onChange={(e) => setTeamBGives(e.target.value)}
                 placeholder="Player IDs, comma separated"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-gray-900"
               />
             </div>
             <div>
@@ -97,7 +97,7 @@ export default function TradesPage() {
                 value={teamBGets}
                 onChange={(e) => setTeamBGets(e.target.value)}
                 placeholder="Player IDs, comma separated"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-gray-900"
               />
             </div>
           </div>
