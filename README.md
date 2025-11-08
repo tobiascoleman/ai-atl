@@ -26,7 +26,7 @@ An NFL fantasy platform that predicts **HOW games will unfold** using AI, not ju
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.23+
 - MongoDB (or use Docker)
 - Gemini API key
 

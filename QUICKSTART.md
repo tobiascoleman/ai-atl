@@ -6,7 +6,7 @@ Get your full-stack AI-powered NFL platform running in **2 minutes**.
 
 ## Prerequisites
 
-- Go 1.21+ installed
+- Go 1.23+ installed
 - Node.js 18+ installed
 - MongoDB running (local or Atlas)
 - Google Gemini API key ([Get one free](https://ai.google.dev/))
