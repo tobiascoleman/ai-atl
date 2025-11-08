@@ -47,9 +47,25 @@ fmt:
 create-indexes:
 	go run scripts/create_indexes.go
 
-# Load sample data (for development)
-load-sample-data:
-	go run scripts/load_sample_data.go
+# Fix player season tracking (run this if you have old data)
+fix-player-seasons:
+	@echo "🔧 This will clear and rebuild the players collection"
+	@echo "⚠️  All existing player data will be deleted"
+	@echo ""
+	@echo "Press Ctrl+C to cancel, or wait 3 seconds to continue..."
+	@sleep 3
+	go run scripts/fix_player_seasons.go
+
+# Load MAXIMUM data from NFLverse (ALL 27 seasons: 1999-2025!)
+# This will download ~10GB of data and take 30-60 minutes
+load-maximum-data:
+	@echo "⚠️  WARNING: This will download ALL NFLverse data (1999-2025)"
+	@echo "📦 Expected size: ~10GB"
+	@echo "⏱️  Expected time: 30-60 minutes"
+	@echo ""
+	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+	@sleep 5
+	go run scripts/load_maximum_data.go
 
 # Full setup for new developers
 setup: deps docker-up

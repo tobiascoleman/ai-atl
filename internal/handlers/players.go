@@ -29,7 +29,7 @@ func (h *PlayerHandler) List(c *gin.Context) {
 
 	// Build filter
 	filter := bson.M{}
-	
+
 	if team := c.Query("team"); team != "" {
 		filter["team"] = team
 	}
@@ -116,7 +116,6 @@ func (h *PlayerHandler) GetStats(c *gin.Context) {
 
 	id := c.Param("id")
 	season, _ := strconv.Atoi(c.DefaultQuery("season", strconv.Itoa(time.Now().Year())))
-	week, _ := strconv.Atoi(c.Query("week"))
 
 	objID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
@@ -131,20 +130,31 @@ func (h *PlayerHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	// Filter weekly stats
-	var filteredStats []models.WeeklyStat
-	for _, stat := range player.WeeklyStats {
-		if stat.Season == season {
-			if week == 0 || stat.Week == week {
-				filteredStats = append(filteredStats, stat)
-			}
-		}
+	// Query player stats from player_stats collection
+	statsCollection := h.db.Collection("player_stats")
+	filter := bson.M{"nfl_id": player.NFLID}
+	if season > 0 {
+		filter["season"] = season
+	}
+
+	cursor, err := statsCollection.Find(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var stats []models.PlayerStats
+	if err = cursor.All(ctx, &stats); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode stats"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"player_id": player.ID,
 		"name":      player.Name,
-		"stats":     filteredStats,
+		"team":      player.Team,
+		"position":  player.Position,
+		"stats":     stats,
 	})
 }
-

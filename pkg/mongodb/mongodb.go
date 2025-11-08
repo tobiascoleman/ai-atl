@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
@@ -41,11 +42,15 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 	// Players collection indexes
 	playerIndexes := []mongo.IndexModel{
 		{
-			Keys:    map[string]interface{}{"nfl_id": 1},
+			// Compound unique index: player can have multiple entries (one per season)
+			Keys:    bson.D{{"nfl_id", 1}, {"season", 1}}, // Use bson.D for ordered keys
 			Options: options.Index().SetUnique(true),
 		},
 		{
-			Keys: map[string]interface{}{"team": 1, "position": 1},
+			Keys: bson.D{{"team", 1}, {"position", 1}},
+		},
+		{
+			Keys: bson.D{{"season", 1}},
 		},
 	}
 	_, err := db.Collection("players").Indexes().CreateMany(ctx, playerIndexes)
@@ -53,14 +58,30 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 		return err
 	}
 
-	// Games collection indexes
-	gameIndexes := []mongo.IndexModel{
+	// Player stats collection indexes
+	playerStatsIndexes := []mongo.IndexModel{
 		{
-			Keys:    map[string]interface{}{"game_id": 1},
+			// Compound unique index: one stats entry per player per season per season_type
+			Keys:    bson.D{{"nfl_id", 1}, {"season", 1}, {"season_type", 1}},
 			Options: options.Index().SetUnique(true),
 		},
 		{
-			Keys: map[string]interface{}{"season": 1, "week": 1},
+			Keys: bson.D{{"season", 1}},
+		},
+	}
+	_, err = db.Collection("player_stats").Indexes().CreateMany(ctx, playerStatsIndexes)
+	if err != nil {
+		return err
+	}
+
+	// Games collection indexes
+	gameIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{"game_id", 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{"season", 1}, {"week", 1}},
 		},
 	}
 	_, err = db.Collection("games").Indexes().CreateMany(ctx, gameIndexes)
@@ -71,11 +92,11 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 	// Plays collection indexes
 	playIndexes := []mongo.IndexModel{
 		{
-			Keys:    map[string]interface{}{"game_id": 1, "play_id": 1},
+			Keys:    bson.D{{"game_id", 1}, {"play_id", 1}},
 			Options: options.Index().SetUnique(true),
 		},
 		{
-			Keys: map[string]interface{}{"season": 1, "week": 1},
+			Keys: bson.D{{"season", 1}, {"week", 1}},
 		},
 	}
 	_, err = db.Collection("plays").Indexes().CreateMany(ctx, playIndexes)
@@ -86,7 +107,7 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 	// Users collection indexes
 	userIndexes := []mongo.IndexModel{
 		{
-			Keys:    map[string]interface{}{"email": 1},
+			Keys:    bson.D{{"email", 1}},
 			Options: options.Index().SetUnique(true),
 		},
 	}
@@ -98,7 +119,7 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 	// Lineups collection indexes
 	lineupIndexes := []mongo.IndexModel{
 		{
-			Keys: map[string]interface{}{"user_id": 1, "week": 1},
+			Keys: bson.D{{"user_id", 1}, {"week", 1}},
 		},
 	}
 	_, err = db.Collection("lineups").Indexes().CreateMany(ctx, lineupIndexes)
@@ -109,7 +130,7 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 	// Votes collection indexes
 	voteIndexes := []mongo.IndexModel{
 		{
-			Keys: map[string]interface{}{"player_id": 1, "week": 1},
+			Keys: bson.D{{"player_id", 1}, {"week", 1}},
 		},
 	}
 	_, err = db.Collection("votes").Indexes().CreateMany(ctx, voteIndexes)

@@ -8,6 +8,7 @@ import (
 	"github.com/ai-atl/nfl-platform/pkg/gemini"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type StreakDetectorService struct {
@@ -36,31 +37,39 @@ func NewStreakDetectorService(db *mongo.Database) *StreakDetectorService {
 func (s *StreakDetectorService) DetectStreaks(ctx context.Context, playerID string, lookbackGames int) ([]Streak, error) {
 	// Get player
 	var player models.Player
-	err := s.db.Collection("players").FindOne(ctx, bson.M{"nfl_id": playerID}).Decode(&player)
+	err := s.db.Collection("players").FindOne(ctx, bson.M{
+		"nfl_id": playerID,
+		"season": 2025, // Current season
+	}).Decode(&player)
 	if err != nil {
 		return nil, fmt.Errorf("player not found: %w", err)
 	}
 	
-	if len(player.WeeklyStats) < lookbackGames {
-		lookbackGames = len(player.WeeklyStats)
+	// Get player stats history
+	statsCollection := s.db.Collection("player_stats")
+	cursor, err := statsCollection.Find(ctx, bson.M{
+		"nfl_id": playerID,
+	}, options.Find().SetSort(bson.D{{"season", -1}}).SetLimit(int64(lookbackGames)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch stats: %w", err)
 	}
+	defer cursor.Close(ctx)
 	
-	// Analyze recent games
-	recentGames := player.WeeklyStats
-	if len(recentGames) > lookbackGames {
-		recentGames = recentGames[len(recentGames)-lookbackGames:]
+	var stats []models.PlayerStats
+	if err := cursor.All(ctx, &stats); err != nil {
+		return nil, fmt.Errorf("failed to decode stats: %w", err)
 	}
 	
 	// Detect patterns
 	streaks := []Streak{}
 	
 	// Check for performance streaks
-	if performanceStreak := s.detectPerformanceStreak(recentGames); performanceStreak != nil {
+	if performanceStreak := s.detectPerformanceStreak(stats); performanceStreak != nil {
 		performanceStreak.PlayerID = player.NFLID
 		performanceStreak.PlayerName = player.Name
 		
 		// Get AI explanation
-		explanation, err := s.explainStreak(ctx, player, recentGames, *performanceStreak)
+		explanation, err := s.explainStreak(ctx, player, stats, *performanceStreak)
 		if err == nil {
 			performanceStreak.AIExplanation = explanation
 		}
@@ -68,91 +77,62 @@ func (s *StreakDetectorService) DetectStreaks(ctx context.Context, playerID stri
 		streaks = append(streaks, *performanceStreak)
 	}
 	
-	// Check for over/under streaks on various stat lines
-	if overStreak := s.detectOverUnderStreak(recentGames, "receiving_yards", 75.5); overStreak != nil {
-		overStreak.PlayerID = player.NFLID
-		overStreak.PlayerName = player.Name
-		streaks = append(streaks, *overStreak)
-	}
-	
 	return streaks, nil
 }
 
-func (s *StreakDetectorService) detectPerformanceStreak(games []models.WeeklyStat) *Streak {
-	if len(games) < 3 {
+func (s *StreakDetectorService) detectPerformanceStreak(stats []models.PlayerStats) *Streak {
+	if len(stats) < 2 {
 		return nil
 	}
 	
-	// Calculate if player is consistently outperforming or underperforming projections
-	outperforms := 0
-	underperforms := 0
-	
-	for _, game := range games {
-		if game.ActualPoints > game.ProjectedPoints {
-			outperforms++
-		} else {
-			underperforms++
-		}
-	}
-	
-	if outperforms >= 3 {
-		return &Streak{
-			StreakType:    "hot",
-			StatLine:      "fantasy_points",
-			GamesInStreak: outperforms,
-			Confidence:    0.80,
-		}
-	} else if underperforms >= 3 {
-		return &Streak{
-			StreakType:    "cold",
-			StatLine:      "fantasy_points",
-			GamesInStreak: underperforms,
-			Confidence:    0.80,
+	// Compare recent seasons to detect trends
+	// Most recent vs previous season
+	if len(stats) >= 2 {
+		current := stats[0]
+		previous := stats[1]
+		
+		// Calculate total production
+		currentTotal := current.PassingYards + current.RushingYards + current.ReceivingYards +
+			(current.PassingTDs+current.RushingTDs+current.ReceivingTDs)*10
+		previousTotal := previous.PassingYards + previous.RushingYards + previous.ReceivingYards +
+			(previous.PassingTDs+previous.RushingTDs+previous.ReceivingTDs)*10
+		
+		improvement := float64(currentTotal-previousTotal) / float64(previousTotal)
+		
+		if improvement > 0.15 { // 15% improvement
+			return &Streak{
+				StreakType:    "hot",
+				StatLine:      "overall_production",
+				GamesInStreak: len(stats),
+				Confidence:    0.75,
+			}
+		} else if improvement < -0.15 { // 15% decline
+			return &Streak{
+				StreakType:    "cold",
+				StatLine:      "overall_production",
+				GamesInStreak: len(stats),
+				Confidence:    0.75,
+			}
 		}
 	}
 	
 	return nil
 }
 
-func (s *StreakDetectorService) detectOverUnderStreak(games []models.WeeklyStat, statName string, line float64) *Streak {
-	if len(games) < 3 {
-		return nil
-	}
-	
-	overs := 0
-	for _, game := range games {
-		// Simplified - would check specific stat
-		if float64(game.Yards) > line {
-			overs++
-		}
-	}
-	
-	if overs >= 3 {
-		return &Streak{
-			StreakType:    "over",
-			StatLine:      fmt.Sprintf("%s %.1f", statName, line),
-			GamesInStreak: overs,
-			Confidence:    0.75,
-		}
-	}
-	
-	return nil
-}
-
-func (s *StreakDetectorService) explainStreak(ctx context.Context, player models.Player, games []models.WeeklyStat, streak Streak) (string, error) {
-	prompt := fmt.Sprintf(`Analyze this player's performance streak:
+func (s *StreakDetectorService) explainStreak(ctx context.Context, player models.Player, stats []models.PlayerStats, streak Streak) (string, error) {
+	prompt := fmt.Sprintf(`Analyze this player's performance trend:
 
 Player: %s (%s - %s)
-Streak: %s for %d consecutive games
+Trend: %s over %d seasons
 Stat line: %s
 
-Recent game data:
+Recent season data:
 %s
 
 Explain:
-1. WHY is this streak happening? (matchups, role changes, team strategy)
+1. WHY is this trend happening? (role changes, team strategy, aging)
 2. Is it sustainable? What factors support continuation?
-3. What could break the streak?
+3. Fantasy outlook for next season?
 
 Provide a concise analysis (3-4 sentences) with actionable insights for fantasy managers.`,
 		player.Name,
@@ -161,7 +141,7 @@ Provide a concise analysis (3-4 sentences) with actionable insights for fantasy 
 		streak.StreakType,
 		streak.GamesInStreak,
 		streak.StatLine,
-		formatGamesForPrompt(games),
+		formatStatsForPrompt(stats),
 	)
 	
 	response, err := s.gemini.GenerateWithRetry(ctx, prompt, 3)
@@ -172,11 +152,14 @@ Provide a concise analysis (3-4 sentences) with actionable insights for fantasy 
 	return response, nil
 }
 
-func formatGamesForPrompt(games []models.WeeklyStat) string {
+func formatStatsForPrompt(stats []models.PlayerStats) string {
 	result := ""
-	for _, game := range games {
-		result += fmt.Sprintf("Week %d: %d yards, %d TDs, %.1f fantasy points\n", 
-			game.Week, game.Yards, game.Touchdowns, game.ActualPoints)
+	for _, stat := range stats {
+		result += fmt.Sprintf("Season %d (%s): Pass: %d yds/%d TDs, Rush: %d yds/%d TDs, Rec: %d rec/%d yds/%d TDs\n",
+			stat.Season, stat.SeasonType,
+			stat.PassingYards, stat.PassingTDs,
+			stat.RushingYards, stat.RushingTDs,
+			stat.Receptions, stat.ReceivingYards, stat.ReceivingTDs)
 	}
 	return result
 }

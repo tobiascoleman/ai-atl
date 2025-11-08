@@ -1,0 +1,445 @@
+package parquet
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/ai-atl/nfl-platform/internal/models"
+	"github.com/apache/arrow/go/v14/arrow"
+	"github.com/apache/arrow/go/v14/arrow/array"
+	"github.com/apache/arrow/go/v14/arrow/memory"
+	"github.com/apache/arrow/go/v14/parquet/file"
+	"github.com/apache/arrow/go/v14/parquet/pqarrow"
+)
+
+// ParsePlayByPlay reads a Parquet file and returns Play models
+func ParsePlayByPlay(data []byte, season int) ([]models.Play, error) {
+	reader, err := file.NewParquetReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parquet reader: %w", err)
+	}
+	defer reader.Close()
+
+	arrowReader, err := pqarrow.NewFileReader(reader, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arrow reader: %w", err)
+	}
+
+	table, err := arrowReader.ReadTable(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read table: %w", err)
+	}
+	defer table.Release()
+
+	numRows := int(table.NumRows())
+	plays := make([]models.Play, 0, numRows)
+
+	// Get column indices
+	schema := table.Schema()
+	colMap := make(map[string]int)
+	for i, field := range schema.Fields() {
+		colMap[field.Name] = i
+	}
+
+	// Helper function to find which chunk contains a row
+	getChunkAndOffset := func(col *arrow.Column, rowIdx int) (arrow.Array, int) {
+		offset := rowIdx
+		for _, chunk := range col.Data().Chunks() {
+			if offset < chunk.Len() {
+				return chunk, offset
+			}
+			offset -= chunk.Len()
+		}
+		return nil, 0
+	}
+
+	// Helper functions to extract values across multiple chunks
+	getString := func(colName string, rowIdx int) string {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.String); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return ""
+	}
+
+	getInt := func(colName string, rowIdx int) int {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				switch arr := chunk.(type) {
+				case *array.Int64:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				case *array.Int32:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				}
+			}
+		}
+		return 0
+	}
+
+	getFloat := func(colName string, rowIdx int) float64 {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.Float64); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return 0.0
+	}
+
+	getBool := func(colName string, rowIdx int) bool {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.Boolean); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return false
+	}
+
+	// Parse each row
+	for i := 0; i < numRows; i++ {
+		// Try 'play_id' first, fall back to 'id' column
+		playID := getString("play_id", i)
+		if playID == "" {
+			playID = getString("id", i)
+		}
+
+		play := models.Play{
+			GameID:           getString("game_id", i),
+			PlayID:           playID,
+			Season:           season,
+			Week:             getInt("week", i),
+			Quarter:          getInt("qtr", i),
+			Down:             getInt("down", i),
+			YardsToGo:        getInt("ydstogo", i),
+			YardLine:         getInt("yardline_100", i),
+			GameSeconds:      getInt("game_seconds_remaining", i),
+			Description:      getString("desc", i),
+			PlayType:         getString("play_type", i),
+			PossessionTeam:   getString("posteam", i),
+			DefenseTeam:      getString("defteam", i),
+			PasserPlayerID:   getString("passer_player_id", i),
+			PasserPlayerName: getString("passer_player_name", i),
+			ReceiverPlayerID: getString("receiver_player_id", i),
+			RusherPlayerID:   getString("rusher_player_id", i),
+			Yards:            getInt("yards_gained", i),
+			Touchdown:        getBool("touchdown", i),
+			Interception:     getBool("interception", i),
+			Fumble:           getBool("fumble", i),
+			Sack:             getBool("sack", i),
+			EPA:              getFloat("epa", i),
+			WPA:              getFloat("wpa", i),
+			SuccessPlay:      getBool("success", i),
+			AirYards:         getInt("air_yards", i),
+			YardsAfterCatch:  getInt("yards_after_catch", i),
+			CreatedAt:        time.Now(),
+		}
+
+		if play.PlayID != "" {
+			plays = append(plays, play)
+		}
+	}
+
+	return plays, nil
+}
+
+// ParseRoster reads a Parquet roster file and returns Player models
+func ParseRoster(data []byte, season int) ([]models.Player, error) {
+	reader, err := file.NewParquetReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parquet reader: %w", err)
+	}
+	defer reader.Close()
+
+	arrowReader, err := pqarrow.NewFileReader(reader, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arrow reader: %w", err)
+	}
+
+	table, err := arrowReader.ReadTable(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read table: %w", err)
+	}
+	defer table.Release()
+
+	numRows := int(table.NumRows())
+	players := make([]models.Player, 0, numRows)
+
+	schema := table.Schema()
+	colMap := make(map[string]int)
+	for i, field := range schema.Fields() {
+		colMap[field.Name] = i
+	}
+
+	getChunkAndOffset := func(col *arrow.Column, rowIdx int) (arrow.Array, int) {
+		offset := rowIdx
+		for _, chunk := range col.Data().Chunks() {
+			if offset < chunk.Len() {
+				return chunk, offset
+			}
+			offset -= chunk.Len()
+		}
+		return nil, 0
+	}
+
+	getString := func(colName string, rowIdx int) string {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.String); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return ""
+	}
+
+	for i := 0; i < numRows; i++ {
+		player := models.Player{
+			NFLID:     getString("gsis_id", i),
+			Season:    season, // Track which year this roster is from
+			Name:      getString("full_name", i),
+			Position:  getString("position", i),
+			Team:      getString("team", i),
+			UpdatedAt: time.Now(),
+		}
+
+		if player.NFLID != "" {
+			players = append(players, player)
+		}
+	}
+
+	return players, nil
+}
+
+// ParsePlayerStats reads a Parquet player stats file and returns PlayerStats models
+func ParsePlayerStats(data []byte, season int, seasonType string) ([]models.PlayerStats, error) {
+	reader, err := file.NewParquetReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parquet reader: %w", err)
+	}
+	defer reader.Close()
+
+	arrowReader, err := pqarrow.NewFileReader(reader, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arrow reader: %w", err)
+	}
+
+	table, err := arrowReader.ReadTable(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read table: %w", err)
+	}
+	defer table.Release()
+
+	numRows := int(table.NumRows())
+	stats := make([]models.PlayerStats, 0, numRows)
+
+	schema := table.Schema()
+	colMap := make(map[string]int)
+	for i, field := range schema.Fields() {
+		colMap[field.Name] = i
+	}
+
+	getChunkAndOffset := func(col *arrow.Column, rowIdx int) (arrow.Array, int) {
+		offset := rowIdx
+		for _, chunk := range col.Data().Chunks() {
+			if offset < chunk.Len() {
+				return chunk, offset
+			}
+			offset -= chunk.Len()
+		}
+		return nil, 0
+	}
+
+	getString := func(colName string, rowIdx int) string {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.String); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return ""
+	}
+
+	getInt := func(colName string, rowIdx int) int {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				switch arr := chunk.(type) {
+				case *array.Int64:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				case *array.Int32:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				}
+			}
+		}
+		return 0
+	}
+
+	for i := 0; i < numRows; i++ {
+		playerStats := models.PlayerStats{
+			NFLID:      getString("player_id", i),
+			Season:     season,
+			SeasonType: seasonType,
+
+			// Passing stats
+			PassingYards:  getInt("passing_yards", i),
+			PassingTDs:    getInt("passing_tds", i),
+			Interceptions: getInt("interceptions", i),
+
+			// Rushing stats
+			RushingYards: getInt("rushing_yards", i),
+			RushingTDs:   getInt("rushing_tds", i),
+
+			// Receiving stats
+			Receptions:     getInt("receptions", i),
+			ReceivingYards: getInt("receiving_yards", i),
+			ReceivingTDs:   getInt("receiving_tds", i),
+			Targets:        getInt("targets", i),
+
+			UpdatedAt: time.Now(),
+		}
+
+		if playerStats.NFLID != "" {
+			stats = append(stats, playerStats)
+		}
+	}
+
+	return stats, nil
+}
+
+// ParseSchedules reads a Parquet schedule file and returns Game models
+func ParseSchedules(data []byte) ([]models.Game, error) {
+	reader, err := file.NewParquetReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parquet reader: %w", err)
+	}
+	defer reader.Close()
+
+	arrowReader, err := pqarrow.NewFileReader(reader, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arrow reader: %w", err)
+	}
+
+	table, err := arrowReader.ReadTable(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read table: %w", err)
+	}
+	defer table.Release()
+
+	numRows := int(table.NumRows())
+	games := make([]models.Game, 0, numRows)
+
+	schema := table.Schema()
+	colMap := make(map[string]int)
+	for i, field := range schema.Fields() {
+		colMap[field.Name] = i
+	}
+
+	getChunkAndOffset := func(col *arrow.Column, rowIdx int) (arrow.Array, int) {
+		offset := rowIdx
+		for _, chunk := range col.Data().Chunks() {
+			if offset < chunk.Len() {
+				return chunk, offset
+			}
+			offset -= chunk.Len()
+		}
+		return nil, 0
+	}
+
+	getString := func(colName string, rowIdx int) string {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.String); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return ""
+	}
+
+	getInt := func(colName string, rowIdx int) int {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				switch arr := chunk.(type) {
+				case *array.Int64:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				case *array.Int32:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				}
+			}
+		}
+		return 0
+	}
+
+	getFloat := func(colName string, rowIdx int) float64 {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.Float64); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return 0.0
+	}
+
+	for i := 0; i < numRows; i++ {
+		game := models.Game{
+			GameID:    getString("game_id", i),
+			Season:    getInt("season", i),
+			Week:      getInt("week", i),
+			HomeTeam:  getString("home_team", i),
+			AwayTeam:  getString("away_team", i),
+			VegasLine: getFloat("spread_line", i),
+			OverUnder: getFloat("total_line", i),
+			HomeScore: getInt("home_score", i),
+			AwayScore: getInt("away_score", i),
+			Status:    "final",
+			UpdatedAt: time.Now(),
+		}
+
+		if game.GameID != "" {
+			games = append(games, game)
+		}
+	}
+
+	return games, nil
+}

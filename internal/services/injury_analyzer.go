@@ -79,13 +79,12 @@ func (s *InjuryAnalyzerService) AnalyzeInjuryImpact(ctx context.Context, playerI
 
 func (s *InjuryAnalyzerService) buildInjuryPrompt(injured models.Player, teammates []models.Player) string {
 	teamStr := fmt.Sprintf("Injured Player: %s (%s - %s)\n", injured.Name, injured.Position, injured.Team)
-	teamStr += fmt.Sprintf("EPA per play: %.2f, Snap share: %.1f%%\n\n", injured.EPAPerPlay, injured.SnapShare*100)
+	teamStr += fmt.Sprintf("Season: %d\n\n", injured.Season)
 	
 	teamStr += "Team Depth Chart:\n"
 	for _, teammate := range teammates {
 		if teammate.Position == injured.Position {
-			teamStr += fmt.Sprintf("- %s: %.2f EPA, %.1f%% snaps\n", 
-				teammate.Name, teammate.EPAPerPlay, teammate.SnapShare*100)
+			teamStr += fmt.Sprintf("- %s (%s)\n", teammate.Name, teammate.Position)
 		}
 	}
 	
@@ -105,13 +104,13 @@ Provide quantified predictions (e.g., "+25%% targets") with reasoning.`, teamStr
 func (s *InjuryAnalyzerService) extractBeneficiaries(teammates []models.Player, injured models.Player) []PlayerBenefit {
 	var benefits []PlayerBenefit
 	
-	// Simple heuristic: players at same position with decent EPA
+	// Simple heuristic: players at same position are potential beneficiaries
 	for _, teammate := range teammates {
-		if teammate.Position == injured.Position && teammate.EPAPerPlay > 0.10 {
+		if teammate.Position == injured.Position && teammate.NFLID != injured.NFLID {
 			benefits = append(benefits, PlayerBenefit{
 				PlayerName:       teammate.Name,
 				ExpectedIncrease: "+30% opportunity",
-				Reasoning:        "Primary backup with strong efficiency metrics",
+				Reasoning:        "Primary backup - expected to absorb injured player's snaps",
 			})
 		}
 	}

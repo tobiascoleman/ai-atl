@@ -53,6 +53,13 @@ go run cmd/api/main.go
 
 The API will be available at `http://localhost:8080`
 
+### 📊 Load Data
+
+**Maximum data (26 seasons, 1M+ plays, 30-60 min)**:
+```bash
+make load-maximum-data
+```
+
 > 🔐 **Yahoo Fantasy OAuth**: add `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URL`, and `CLIENT_APP_URL` to your `.env` to enable the new fantasy integration. See `ENV_SETUP.md` for full instructions.
 
 ### API Endpoints

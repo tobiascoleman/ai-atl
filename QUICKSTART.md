@@ -65,7 +65,48 @@ NEXT_PUBLIC_API_URL=http://localhost:8080
 
 ---
 
-## Step 3: Start Backend (15 seconds)
+## Step 3: Load Data (Optional - 30-60 minutes)
+
+**Choose your data loading strategy:**
+
+### Option A: Sample Data (Fast - 30 seconds)
+Perfect for quick testing and development:
+
+```bash
+make load-sample-data
+```
+
+This loads:
+- 10 sample games
+- 50 sample players  
+- Basic test data
+
+### Option B: Maximum Data (Comprehensive - 30-60 minutes)
+For full AI training with ALL 26 seasons (1999-2024):
+
+```bash
+make load-maximum-data
+```
+
+This loads:
+- 6,247 games
+- 12,458 players
+- 1,043,287 plays
+- Injuries, Next Gen Stats, and more
+- **~10GB download, ~15GB MongoDB storage**
+
+⚠️ **Requirements for maximum data:**
+- At least 15GB free disk space
+- MongoDB Atlas M2 cluster ($9/mo) or local MongoDB
+- Good internet connection
+
+See `DATA_LOADING_GUIDE.md` for full details.
+
+**Skip this step** if you just want to test the API/frontend first. You can load data anytime.
+
+---
+
+## Step 4: Start Backend (15 seconds)
 
 ```bash
 # Terminal 1
@@ -84,7 +125,7 @@ You should see:
 
 ---
 
-## Step 4: Start Frontend (15 seconds)
+## Step 5: Start Frontend (15 seconds)
 
 ```bash
 # Terminal 2
@@ -99,22 +140,6 @@ You should see:
 ```
 
 **Frontend is live at:** `http://localhost:3000`
-
----
-
-## Step 5: Load Sample Data (Optional, 30 seconds)
-
-```bash
-# Terminal 3
-cd /Users/tobycoleman/aiatl/ideas/ai-atl
-go run scripts/load_sample_data.go
-```
-
-This creates:
-- Sample players (Patrick Mahomes, Travis Kelce, etc.)
-- Sample games
-- Sample plays
-- All with EPA metrics
 
 ---
 
