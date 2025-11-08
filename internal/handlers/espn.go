@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/ai-atl/nfl-platform/internal/models"
+	"github.com/ai-atl/nfl-platform/internal/services"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -16,12 +16,14 @@ import (
 type ESPNHandler struct {
 	db              *mongo.Database
 	flaskServiceURL string
+	advisorService  *services.FantasyAdvisorService
 }
 
 func NewESPNHandler(db *mongo.Database, flaskServiceURL string) *ESPNHandler {
 	return &ESPNHandler{
 		db:              db,
 		flaskServiceURL: flaskServiceURL,
+		advisorService:  services.NewFantasyAdvisorService(db),
 	}
 }
 
@@ -351,7 +353,7 @@ type AIStartSitResponse struct {
 	PlayerBName    string `json:"playerBName"`
 }
 
-// GetAIStartSitAdvice provides AI-powered start/sit recommendations
+// GetAIStartSitAdvice provides AI-powered start/sit recommendations with database enrichment
 func (h *ESPNHandler) GetAIStartSitAdvice(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
@@ -365,35 +367,43 @@ func (h *ESPNHandler) GetAIStartSitAdvice(c *gin.Context) {
 		return
 	}
 
-	// Call Flask service to get AI recommendation
-	flaskURL := fmt.Sprintf("%s/api/espn/ai-start-sit", h.flaskServiceURL)
-
-	jsonData, err := json.Marshal(req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal request"})
-		return
+	// Extract player data
+	playerAInj := ""
+	if req.PlayerA.InjuryStatus != nil {
+		playerAInj = *req.PlayerA.InjuryStatus
 	}
 
-	resp, err := http.Post(flaskURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to call AI service"})
-		return
+	playerBInj := ""
+	if req.PlayerB.InjuryStatus != nil {
+		playerBInj = *req.PlayerB.InjuryStatus
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+	// Call advisor service with database enrichment
+	comparison, err := h.advisorService.GetStartSitAdvice(
+		c.Request.Context(),
+		req.PlayerA.Name, req.PlayerA.Position, req.PlayerA.ProTeam,
+		req.PlayerA.ProjectedPoints, req.PlayerA.Points,
+		req.PlayerA.Injured, playerAInj,
+		req.PlayerB.Name, req.PlayerB.Position, req.PlayerB.ProTeam,
+		req.PlayerB.ProjectedPoints, req.PlayerB.Points,
+		req.PlayerB.Injured, playerBInj,
+	)
+
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "AI service returned error: " + string(body),
+			"error": "failed to generate AI recommendation: " + err.Error(),
 		})
 		return
 	}
 
-	var aiResp AIStartSitResponse
-	if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse AI response"})
-		return
+	// Build response
+	response := AIStartSitResponse{
+		Recommendation: comparison.Recommendation,
+		Confidence:     comparison.Confidence,
+		Reasoning:      comparison.Reasoning,
+		PlayerAName:    comparison.PlayerAName,
+		PlayerBName:    comparison.PlayerBName,
 	}
 
-	c.JSON(http.StatusOK, aiResp)
+	c.JSON(http.StatusOK, response)
 }
