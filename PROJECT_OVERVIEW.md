@@ -13,7 +13,7 @@ A full-stack AI-powered NFL fantasy analytics platform built for the ATL Hackath
 
 ```
 Backend Stack:
-- Go 1.21+ with Gin framework
+- Go 1.23+ with Gin framework
 - MongoDB with official Go driver
 - Google Gemini AI API
 - NFLverse data integration (Apache Arrow)

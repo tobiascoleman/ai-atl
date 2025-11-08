@@ -31,7 +31,7 @@ Building an NFL fantasy platform with **AI Game Script Prediction** as our prima
 
 ### Tech Stack
 ```
-Backend:  Go 1.21+ with Gin framework
+Backend:  Go 1.23+ with Gin framework
 Database: MongoDB via official Go driver
 AI:       Google Gemini API
 Cache:    Redis
