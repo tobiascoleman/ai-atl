@@ -9,6 +9,13 @@ import {
   fetchFantasyTeams,
   getYahooAuthUrl,
 } from "@/lib/api/fantasy";
+import {
+  fetchESPNStatus,
+  fetchESPNRoster,
+  saveESPNCredentials,
+  ESPNPlayer,
+  ESPNCredentials,
+} from "@/lib/api/espn";
 import { FantasyStatusResponse, YahooTeam } from "@/types/api";
 
 export default function FantasyPage() {
@@ -19,6 +26,20 @@ export default function FantasyPage() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // ESPN state
+  const [espnConnected, setEspnConnected] = useState(false);
+  const [espnRoster, setEspnRoster] = useState<ESPNPlayer[]>([]);
+  const [espnLoading, setEspnLoading] = useState(false);
+  const [espnError, setEspnError] = useState<string | null>(null);
+  const [showESPNForm, setShowESPNForm] = useState(false);
+  const [espnCreds, setEspnCreds] = useState<ESPNCredentials>({
+    espn_s2: "",
+    espn_swid: "",
+    league_id: 0,
+    team_id: 0,
+    year: 2025,
+  });
 
   const connectedQuery = useMemo(
     () => searchParams?.get("connected"),
@@ -54,9 +75,48 @@ export default function FantasyPage() {
     }
   }, []);
 
+  const loadESPNData = useCallback(async () => {
+    setEspnLoading(true);
+    setEspnError(null);
+    try {
+      const espnStatus = await fetchESPNStatus();
+      setEspnConnected(espnStatus.connected);
+
+      if (espnStatus.connected) {
+        const rosterData = await fetchESPNRoster();
+        setEspnRoster(rosterData.players);
+      } else {
+        setEspnRoster([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setEspnError("Unable to reach ESPN service. Please try again.");
+    } finally {
+      setEspnLoading(false);
+    }
+  }, []);
+
+  const handleESPNConnect = async () => {
+    setEspnLoading(true);
+    setEspnError(null);
+    try {
+      await saveESPNCredentials(espnCreds);
+      setEspnConnected(true);
+      setShowESPNForm(false);
+      await loadESPNData();
+      setSuccess("ESPN account connected successfully!");
+    } catch (err) {
+      console.error(err);
+      setEspnError("Failed to save ESPN credentials. Please check your input.");
+    } finally {
+      setEspnLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadFantasyData();
-  }, [loadFantasyData]);
+    loadESPNData();
+  }, [loadFantasyData, loadESPNData]);
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -207,6 +267,209 @@ export default function FantasyPage() {
           </div>
         </section>
       )}
+
+      {/* ESPN Fantasy Section */}
+      <section className="rounded-xl bg-white p-6 shadow-sm border-2 border-orange-200">
+        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <span className="text-orange-600">ESPN</span> Fantasy Football
+        </h2>
+
+        {espnError && (
+          <div className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+            {espnError}
+          </div>
+        )}
+
+        {!espnConnected && !showESPNForm && (
+          <div className="mt-4 space-y-4">
+            <p className="text-gray-600">
+              Connect your ESPN Fantasy Football account to view your roster
+              directly in AI-ATL.
+            </p>
+            <button
+              onClick={() => setShowESPNForm(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-medium text-white transition hover:bg-orange-700"
+            >
+              <Link2 size={18} />
+              Connect ESPN Account
+            </button>
+          </div>
+        )}
+
+        {showESPNForm && (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
+              <p className="font-medium">How to get your ESPN credentials:</p>
+              <ol className="mt-2 list-decimal list-inside space-y-1">
+                <li>Log into ESPN Fantasy Football in your browser</li>
+                <li>Open Developer Tools (F12)</li>
+                <li>Go to Application → Cookies → fantasy.espn.com</li>
+                <li>Copy the <code>espn_s2</code> and <code>SWID</code> values</li>
+                <li>Get your league ID and team ID from your team URL</li>
+              </ol>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ESPN_S2 Cookie
+                </label>
+                <input
+                  type="text"
+                  value={espnCreds.espn_s2}
+                  onChange={(e) =>
+                    setEspnCreds({ ...espnCreds, espn_s2: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  placeholder="Long cookie string..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  SWID Cookie
+                </label>
+                <input
+                  type="text"
+                  value={espnCreds.espn_swid}
+                  onChange={(e) =>
+                    setEspnCreds({ ...espnCreds, espn_swid: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    League ID
+                  </label>
+                  <input
+                    type="number"
+                    value={espnCreds.league_id || ""}
+                    onChange={(e) =>
+                      setEspnCreds({
+                        ...espnCreds,
+                        league_id: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Team ID
+                  </label>
+                  <input
+                    type="number"
+                    value={espnCreds.team_id || ""}
+                    onChange={(e) =>
+                      setEspnCreds({
+                        ...espnCreds,
+                        team_id: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Year
+                  </label>
+                  <input
+                    type="number"
+                    value={espnCreds.year}
+                    onChange={(e) =>
+                      setEspnCreds({
+                        ...espnCreds,
+                        year: parseInt(e.target.value) || 2025,
+                      })
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleESPNConnect}
+                  disabled={espnLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-medium text-white transition hover:bg-orange-700 disabled:bg-orange-300"
+                >
+                  {espnLoading ? "Connecting..." : "Submit"}
+                </button>
+                <button
+                  onClick={() => setShowESPNForm(false)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {espnConnected && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-medium text-green-600">
+                ESPN account connected
+              </p>
+              <button
+                onClick={loadESPNData}
+                disabled={espnLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300"
+              >
+                <RefreshCcw size={14} />
+                Refresh
+              </button>
+            </div>
+
+            {espnLoading && (
+              <p className="text-sm text-gray-500">Loading your roster...</p>
+            )}
+
+            {!espnLoading && espnRoster.length === 0 && (
+              <p className="text-sm text-gray-500">
+                No roster data available. Please check your credentials.
+              </p>
+            )}
+
+            {!espnLoading && espnRoster.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">
+                  Your ESPN Roster ({espnRoster.length} players):
+                </p>
+                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                  {espnRoster.map((player, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {player.name}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {player.position} - {player.proTeam}
+                          </p>
+                        </div>
+                        <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                          {player.lineupSlot}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

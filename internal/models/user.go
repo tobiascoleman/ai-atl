@@ -17,6 +17,11 @@ type User struct {
 	YahooRefreshToken string        `json:"-" bson:"yahoo_refresh_token,omitempty"`
 	YahooTokenExpiry  time.Time     `json:"-" bson:"yahoo_token_expiry,omitempty"`
 	YahooGuid         string        `json:"-" bson:"yahoo_guid,omitempty"`
+	ESPNS2            string        `json:"-" bson:"espn_s2,omitempty"`
+	ESPNSWID          string        `json:"-" bson:"espn_swid,omitempty"`
+	LeagueID          int           `json:"-" bson:"league_id,omitempty"`
+	TeamID            int           `json:"-" bson:"team_id,omitempty"`
+	Year              int           `json:"-" bson:"year,omitempty"`
 }
 
 // UserResponse is used for API responses (excludes password)
@@ -26,6 +31,7 @@ type UserResponse struct {
 	Username       string    `json:"username"`
 	CreatedAt      time.Time `json:"created_at"`
 	YahooConnected bool      `json:"yahoo_connected"`
+	ESPNConnected  bool      `json:"espn_connected"`
 }
 
 func (u *User) ToResponse() UserResponse {
@@ -35,5 +41,6 @@ func (u *User) ToResponse() UserResponse {
 		Username:       u.Username,
 		CreatedAt:      u.CreatedAt,
 		YahooConnected: u.YahooAccessToken != "",
+		ESPNConnected:  u.ESPNS2 != "" && u.ESPNSWID != "",
 	}
 }
