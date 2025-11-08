@@ -273,6 +273,7 @@ func (l *DataLoader) loadWeeklyRosterYear(ctx context.Context, year int) {
 
 	// Parse weekly rosters which include injury status
 	weeklyRosters := l.parseWeeklyRoster(data, year)
+	fmt.Printf("  📦 Parsed %d weekly roster entries\n", len(weeklyRosters))
 
 	// Update players with injury status
 	updated := l.updatePlayerInjuryStatus(ctx, weeklyRosters)
@@ -654,6 +655,7 @@ func (l *DataLoader) parseWeeklyRoster(data []byte, season int) []models.WeeklyR
 
 func (l *DataLoader) updatePlayerInjuryStatus(ctx context.Context, weeklyRosters []models.WeeklyRosterEntry) int {
 	if len(weeklyRosters) == 0 {
+		fmt.Println("  ⚠️  No weekly roster entries to process")
 		return 0
 	}
 
@@ -673,7 +675,10 @@ func (l *DataLoader) updatePlayerInjuryStatus(ctx context.Context, weeklyRosters
 		}
 	}
 
+	fmt.Printf("  📊 Parsed %d weekly entries → %d unique players\n", len(weeklyRosters), len(playerStatusMap))
+
 	updated := 0
+	matched := 0
 	for _, entry := range playerStatusMap {
 		filter := bson.M{
 			"nfl_id": entry.NFLID,
@@ -695,10 +700,15 @@ func (l *DataLoader) updatePlayerInjuryStatus(ctx context.Context, weeklyRosters
 			continue
 		}
 
+		if result.MatchedCount > 0 {
+			matched++
+		}
 		if result.ModifiedCount > 0 {
 			updated++
 		}
 	}
+
+	fmt.Printf("  📍 Matched: %d players, Modified: %d players\n", matched, updated)
 
 	return updated
 }
