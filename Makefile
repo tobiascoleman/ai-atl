@@ -58,14 +58,24 @@ fix-player-seasons:
 
 # Load MAXIMUM data from NFLverse (ALL 27 seasons: 1999-2025!)
 # This will download ~10GB of data and take 30-60 minutes
+# EPA is automatically parsed from the parquet files!
 load-maximum-data:
 	@echo "⚠️  WARNING: This will download ALL NFLverse data (1999-2025)"
 	@echo "📦 Expected size: ~10GB"
 	@echo "⏱️  Expected time: 30-60 minutes"
+	@echo "✨ EPA will be automatically parsed from parquet files"
 	@echo ""
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
 	go run scripts/load_maximum_data.go
+
+# Quick reload of just player_stats with corrected column names (much faster!)
+reload-player-stats:
+	@echo "🔄 Reloading player_stats with corrected column names"
+	@echo "⏱️  Expected time: 5-10 minutes"
+	@echo "✨ Includes: EPA, correct interceptions, defensive stats"
+	@echo ""
+	go run scripts/reload_player_stats.go
 
 # Full setup for new developers
 setup: deps docker-up

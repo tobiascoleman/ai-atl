@@ -3,8 +3,10 @@ import { Player } from '@/types/api'
 
 export const playersAPI = {
   getPlayers: async (params?: {
+    search?: string
     team?: string
     position?: string
+    current?: string
     page?: number
     limit?: number
     sort?: string

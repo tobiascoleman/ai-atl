@@ -81,6 +81,10 @@ func main() {
 		protected := v1.Group("")
 		protected.Use(middleware.AuthRequired())
 		{
+			// Dashboard stats
+			statsHandler := handlers.NewStatsHandler(db)
+			protected.GET("/stats/dashboard", statsHandler.GetDashboardStats)
+
 			fantasy := protected.Group("/fantasy")
 			{
 				fantasy.GET("/status", fantasyHandler.Status)

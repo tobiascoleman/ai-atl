@@ -18,13 +18,13 @@ export default function HomePage() {
               href="/login"
               className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
             >
-              Get Started
+              Sign In
             </Link>
             <Link
               href="/register"
               className="px-8 py-3 bg-white text-blue-600 rounded-lg font-semibold border-2 border-blue-600 hover:bg-blue-50 transition"
             >
-              Sign Up
+              Register
             </Link>
           </div>
         </div>
@@ -51,22 +51,6 @@ export default function HomePage() {
             title="Community Insights"
             description="See what the community thinks about player predictions"
           />
-        </div>
-
-        {/* CTA Section */}
-        <div className="mt-20 bg-white rounded-2xl p-12 shadow-xl text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to Win Your League?
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Join thousands of fantasy managers using AI to gain the edge
-          </p>
-          <Link
-            href="/register"
-            className="inline-block px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition"
-          >
-            Start Free Trial
-          </Link>
         </div>
       </div>
     </div>

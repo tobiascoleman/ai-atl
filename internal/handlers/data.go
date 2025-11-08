@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -371,19 +373,34 @@ func (h *DataHandler) GetUpcomingGames(c *gin.Context) {
 
 // GetPlayerSummary - GET /api/data/players/:nfl_id/summary?season=2024
 func (h *DataHandler) GetPlayerSummary(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // Fast now - EPA pre-calculated
 	defer cancel()
 
 	nflID := c.Param("nfl_id")
-	season, _ := strconv.Atoi(c.DefaultQuery("season", "2024"))
+	season, _ := strconv.Atoi(c.DefaultQuery("season", "2025"))
+
+	log.Printf("🔍 GetPlayerSummary: nfl_id=%s, season=%d", nflID, season)
 
 	summary, err := h.service.GetPlayerSummary(ctx, nflID, season)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch player summary"})
+		log.Printf("❌ GetPlayerSummary error: %v", err)
+		if err.Error() == "mongo: no documents in result" {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Player not found: %s for season %d", nflID, season)})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to fetch player summary: %v", err)})
+		}
 		return
 	}
 
 	c.JSON(http.StatusOK, summary)
+}
+
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // GetTeamDepthChart - GET /api/data/teams/:team/depth-chart?season=2024

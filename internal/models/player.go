@@ -30,9 +30,9 @@ type PlayerStats struct {
 	ID         bson.ObjectID `json:"id" bson:"_id,omitempty"`
 	NFLID      string        `json:"nfl_id" bson:"nfl_id"`
 	Season     int           `json:"season" bson:"season"`
-	SeasonType string        `json:"season_type" bson:"season_type"` // REG, POST
+	SeasonType string        `json:"season_type" bson:"season_type"` // REG, POST, REGPOST
 
-	// Stats will be populated when we load player_stats files
+	// Offensive Stats
 	PassingYards   int `json:"passing_yards" bson:"passing_yards"`
 	PassingTDs     int `json:"passing_tds" bson:"passing_tds"`
 	Interceptions  int `json:"interceptions" bson:"interceptions"`
@@ -42,6 +42,24 @@ type PlayerStats struct {
 	ReceivingYards int `json:"receiving_yards" bson:"receiving_yards"`
 	ReceivingTDs   int `json:"receiving_tds" bson:"receiving_tds"`
 	Targets        int `json:"targets" bson:"targets"`
+
+	// Defensive Stats
+	Tackles          int     `json:"tackles" bson:"tackles"`
+	TacklesSolo      int     `json:"tackles_solo" bson:"tackles_solo"`
+	TacklesAssist    int     `json:"tackles_assist" bson:"tackles_assist"`
+	TacklesForLoss   float64 `json:"tackles_for_loss" bson:"tackles_for_loss"`
+	Sacks            float64 `json:"sacks" bson:"sacks"`
+	SackYards        float64 `json:"sack_yards" bson:"sack_yards"`
+	DefInterceptions int     `json:"def_interceptions" bson:"def_interceptions"` // Defensive INTs (different from QB INTs)
+	PassDefended     int     `json:"pass_defended" bson:"pass_defended"`
+	ForcedFumbles    int     `json:"forced_fumbles" bson:"forced_fumbles"`
+	FumbleRecoveries int     `json:"fumble_recoveries" bson:"fumble_recoveries"`
+	DefensiveTDs     int     `json:"defensive_tds" bson:"defensive_tds"`
+	SafetyMD         int     `json:"safety_md" bson:"safety_md"` // Safeties
+
+	// Performance Metrics (pre-calculated)
+	EPA       float64 `json:"epa" bson:"epa"`               // Expected Points Added
+	PlayCount int     `json:"play_count" bson:"play_count"` // Number of plays involved in
 
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
@@ -103,5 +121,54 @@ func (w *WeeklyRosterEntry) GetInjuryDescription() string {
 	if w.Status == "INA" {
 		return "Inactive"
 	}
+	return "Active"
+}
+
+// GetPlayerStatusDescription returns a human-readable status for any player status code
+func GetPlayerStatusDescription(status, statusAbbr string) string {
+	// Full status code mapping from NFLverse documentation
+	statusMap := map[string]string{
+		// Reserve statuses (injured)
+		"R01": "Reserve/Injured",
+		"R02": "Reserve/Retired",
+		"R03": "Reserve/Left Squad",
+		"R04": "Reserve/PUP",
+		"R05": "Reserve/Military",
+		"R06": "Reserve/Non-Football Injury",
+		"R07": "Reserve/Suspended",
+		"R08": "Reserve/Did Not Report",
+		"R09": "Reserve/Commissioner Permission",
+		"R48": "Reserve/Injured; DFR",
+
+		// Practice Squad statuses
+		"P01": "Practice Squad",
+		"P02": "Practice Squad; Injured",
+		"P03": "Practice Squad; Exempt",
+
+		// Active statuses
+		"A01": "Active",
+		"A02": "Active/Physically Unable to Perform",
+		"A03": "Active/Non-Football Injury",
+		"A04": "Active/Commissioner Exempt",
+		"A07": "Active/Suspended",
+
+		// Waived statuses
+		"W01": "Waived/Injured",
+		"W03": "Waived/Injured; Settlement",
+
+		// Other
+		"E01": "Exempt/Left Squad",
+	}
+
+	if desc, ok := statusMap[statusAbbr]; ok {
+		return desc
+	}
+
+	if status == "INA" {
+		return "Inactive"
+	} else if status == "ACT" {
+		return "Active"
+	}
+
 	return "Active"
 }

@@ -19,11 +19,40 @@ export interface Player {
   name: string;
   team: string;
   position: string;
-  weekly_stats: WeeklyStat[];
-  epa_per_play: number;
-  success_rate: number;
-  snap_share: number;
-  target_share: number;
+  season: number;
+  status?: string;
+  status_description_abbr?: string;
+  status_description?: string; // Human-readable status
+  week?: number;
+  
+  // Enriched stats from backend
+  passing_yards?: number;
+  passing_tds?: number;
+  rushing_yards?: number;
+  rushing_tds?: number;
+  receiving_yards?: number;
+  receiving_tds?: number;
+  receptions?: number;
+  
+  // Defensive stats
+  tackles?: number;
+  tackles_solo?: number;
+  sacks?: number;
+  tackles_for_loss?: number;
+  def_interceptions?: number;
+  pass_defended?: number;
+  forced_fumbles?: number;
+  fumble_recoveries?: number;
+  
+  avg_epa: number;
+  is_current_player: boolean;
+  
+  // Legacy fields (may not be populated)
+  weekly_stats?: WeeklyStat[];
+  epa_per_play?: number;
+  success_rate?: number;
+  snap_share?: number;
+  target_share?: number;
   injury_status?: string;
   updated_at: string;
 }

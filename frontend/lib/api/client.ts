@@ -29,8 +29,17 @@ class APIClient {
       (response) => response,
       (error) => {
         if (error.response?.status === 401 && typeof window !== 'undefined') {
-          localStorage.removeItem('token')
-          window.location.href = '/login'
+          // Only redirect if we're not already on an auth page
+          const currentPath = window.location.pathname
+          const isAuthPage = currentPath === '/login' || currentPath === '/register'
+          
+          if (!isAuthPage) {
+            // User's token expired, redirect to login
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+            window.location.href = '/login'
+          }
+          // If we're already on auth page, just let the error propagate normally
         }
         return Promise.reject(error)
       }

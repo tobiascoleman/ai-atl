@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type PlayerHandler struct {
@@ -21,26 +21,60 @@ func NewPlayerHandler(db *mongo.Database) *PlayerHandler {
 	return &PlayerHandler{db: db}
 }
 
-// List returns a list of players with optional filters
+type PlayerWithStats struct {
+	models.Player
+	// Offensive Stats
+	PassingYards   int `json:"passing_yards,omitempty"`
+	PassingTDs     int `json:"passing_tds,omitempty"`
+	RushingYards   int `json:"rushing_yards,omitempty"`
+	RushingTDs     int `json:"rushing_tds,omitempty"`
+	ReceivingYards int `json:"receiving_yards,omitempty"`
+	ReceivingTDs   int `json:"receiving_tds,omitempty"`
+	Receptions     int `json:"receptions,omitempty"`
+
+	// Defensive Stats
+	Tackles          int     `json:"tackles,omitempty"`
+	TacklesSolo      int     `json:"tackles_solo,omitempty"`
+	Sacks            float64 `json:"sacks,omitempty"`
+	TacklesForLoss   float64 `json:"tackles_for_loss,omitempty"`
+	DefInterceptions int     `json:"def_interceptions,omitempty"`
+	PassDefended     int     `json:"pass_defended,omitempty"`
+	ForcedFumbles    int     `json:"forced_fumbles,omitempty"`
+	FumbleRecoveries int     `json:"fumble_recoveries,omitempty"`
+
+	AvgEPA            float64 `json:"avg_epa"`
+	IsCurrentPlayer   bool    `json:"is_current_player"`
+	StatusDescription string  `json:"status_description"` // Human-readable status
+}
+
+// List returns a list of unique players (one entry per player, showing most recent season)
 func (h *PlayerHandler) List(c *gin.Context) {
 	collection := h.db.Collection("players")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Build filter
-	filter := bson.M{}
+	// Build match filter
+	matchFilter := bson.M{}
 
+	// Team filter
 	if team := c.Query("team"); team != "" {
-		filter["team"] = team
+		matchFilter["team"] = team
 	}
+
+	// Position filter
 	if position := c.Query("position"); position != "" {
-		filter["position"] = position
+		matchFilter["position"] = position
+	}
+
+	// Search filter (name search)
+	if search := c.Query("search"); search != "" {
+		matchFilter["name"] = bson.M{"$regex": search, "$options": "i"}
 	}
 
 	// Pagination
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	skip := (page - 1) * limit
+	limitNum, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	skip := (page - 1) * limitNum
 
 	// Sorting
 	sortField := c.DefaultQuery("sort", "name")
@@ -49,13 +83,29 @@ func (h *PlayerHandler) List(c *gin.Context) {
 		sortOrder = -1
 	}
 
-	opts := options.Find().
-		SetSkip(int64(skip)).
-		SetLimit(int64(limit)).
-		SetSort(bson.D{{Key: sortField, Value: sortOrder}})
+	// Aggregation pipeline to get unique players with their most recent season
+	pipeline := mongo.Pipeline{
+		// Match filters
+		{{Key: "$match", Value: matchFilter}},
+		// Sort by season descending to get most recent first
+		{{Key: "$sort", Value: bson.D{{Key: "season", Value: -1}}}},
+		// Group by nfl_id and take the first (most recent) document
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$nfl_id"},
+			{Key: "doc", Value: bson.D{{Key: "$first", Value: "$$ROOT"}}},
+		}}},
+		// Replace root with the document
+		{{Key: "$replaceRoot", Value: bson.D{{Key: "newRoot", Value: "$doc"}}}},
+		// Sort by name (or other field)
+		{{Key: "$sort", Value: bson.D{{Key: sortField, Value: sortOrder}}}},
+		// Pagination
+		{{Key: "$skip", Value: skip}},
+		{{Key: "$limit", Value: limitNum}},
+	}
 
-	cursor, err := collection.Find(ctx, filter, opts)
+	cursor, err := collection.Aggregate(ctx, pipeline)
 	if err != nil {
+		log.Printf("❌ Aggregation error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch players"})
 		return
 	}
@@ -63,18 +113,76 @@ func (h *PlayerHandler) List(c *gin.Context) {
 
 	var players []models.Player
 	if err := cursor.All(ctx, &players); err != nil {
+		log.Printf("❌ Decode error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode players"})
 		return
 	}
 
+	// Enrich players with stats (but NOT EPA - too slow to calculate per player)
+	enrichedPlayers := make([]PlayerWithStats, 0, len(players))
+	for _, player := range players {
+		enriched := PlayerWithStats{
+			Player:            player,
+			IsCurrentPlayer:   player.Season == 2025,
+			AvgEPA:            0, // EPA calculation removed for performance
+			StatusDescription: models.GetPlayerStatusDescription(player.Status, player.StatusDescriptionAbbr),
+		}
+
+		// Get latest season stats - NFLverse uses "REGPOST" for combined regular + postseason
+		var stats models.PlayerStats
+
+		err := h.db.Collection("player_stats").FindOne(
+			ctx,
+			bson.M{
+				"nfl_id":      player.NFLID,
+				"season":      player.Season,
+				"season_type": "REGPOST",
+			},
+		).Decode(&stats)
+
+		// If REGPOST not found, try without season_type filter as fallback
+		if err != nil {
+			err = h.db.Collection("player_stats").FindOne(
+				ctx,
+				bson.M{
+					"nfl_id": player.NFLID,
+					"season": player.Season,
+				},
+			).Decode(&stats)
+		}
+
+		if err == nil {
+			// Offensive Stats
+			enriched.PassingYards = stats.PassingYards
+			enriched.PassingTDs = stats.PassingTDs
+			enriched.RushingYards = stats.RushingYards
+			enriched.RushingTDs = stats.RushingTDs
+			enriched.ReceivingYards = stats.ReceivingYards
+			enriched.ReceivingTDs = stats.ReceivingTDs
+			enriched.Receptions = stats.Receptions
+
+			// Defensive Stats
+			enriched.Tackles = stats.Tackles
+			enriched.TacklesSolo = stats.TacklesSolo
+			enriched.Sacks = stats.Sacks
+			enriched.TacklesForLoss = stats.TacklesForLoss
+			enriched.DefInterceptions = stats.DefInterceptions
+			enriched.PassDefended = stats.PassDefended
+			enriched.ForcedFumbles = stats.ForcedFumbles
+			enriched.FumbleRecoveries = stats.FumbleRecoveries
+		}
+
+		enrichedPlayers = append(enrichedPlayers, enriched)
+	}
+
 	// Get total count
-	total, _ := collection.CountDocuments(ctx, filter)
+	total, _ := collection.CountDocuments(ctx, matchFilter)
 
 	c.JSON(http.StatusOK, gin.H{
-		"players": players,
+		"players": enrichedPlayers,
 		"total":   total,
 		"page":    page,
-		"limit":   limit,
+		"limit":   limitNum,
 	})
 }
 
