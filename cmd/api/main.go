@@ -117,6 +117,41 @@ func main() {
 				lineups.POST("/optimize", lineupHandler.Optimize)
 			}
 
+			// Data endpoints (for querying NFL data)
+			data := protected.Group("/data")
+			{
+				dataHandler := handlers.NewDataHandler(db)
+
+				// Player queries
+				data.GET("/players/:nfl_id", dataHandler.GetPlayer)
+				data.GET("/players/:nfl_id/stats", dataHandler.GetPlayerStats)
+				data.GET("/players/:nfl_id/epa", dataHandler.GetPlayerEPA)
+				data.GET("/players/:nfl_id/plays", dataHandler.GetPlayerPlays)
+				data.GET("/players/:nfl_id/ngs", dataHandler.GetPlayerNGS)
+				data.GET("/players/:nfl_id/summary", dataHandler.GetPlayerSummary)
+
+				// Team queries
+				data.GET("/teams/:team/players", dataHandler.GetPlayersByTeam)
+				data.GET("/teams/:team/epa", dataHandler.GetTeamEPA)
+				data.GET("/teams/:team/plays", dataHandler.GetTeamPlays)
+				data.GET("/teams/:team/depth-chart", dataHandler.GetTeamDepthChart)
+				data.GET("/teams/:team/upcoming", dataHandler.GetUpcomingGames)
+
+				// Position queries
+				data.GET("/positions/:position", dataHandler.GetPlayersByPosition)
+
+				// Injury queries
+				data.GET("/injuries", dataHandler.GetInjuredPlayers)
+
+				// Game queries
+				data.GET("/games", dataHandler.GetGamesBySeason)
+				data.GET("/games/:game_id", dataHandler.GetGame)
+				data.GET("/games/:game_id/plays", dataHandler.GetGamePlays)
+
+				// NGS leaders
+				data.GET("/ngs/leaders", dataHandler.GetNGSLeaders)
+			}
+
 			// Insights (AI-powered features)
 			insights := protected.Group("/insights")
 			{
