@@ -96,6 +96,7 @@ func main() {
 				espn.GET("/roster", espnHandler.GetRoster)
 				espn.GET("/optimize-lineup", espnHandler.OptimizeLineup)
 				espn.GET("/free-agents", espnHandler.GetFreeAgents)
+				espn.POST("/ai-start-sit", espnHandler.GetAIStartSitAdvice)
 			}
 
 			// Players

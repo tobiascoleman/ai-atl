@@ -93,3 +93,27 @@ export async function fetchFreeAgents(
   );
   return data;
 }
+
+export interface AIStartSitRequest {
+  playerA: ESPNPlayer;
+  playerB: ESPNPlayer;
+}
+
+export interface AIStartSitResponse {
+  recommendation: string; // "A" or "B"
+  confidence: number; // 0-100
+  reasoning: string;
+  playerAName: string;
+  playerBName: string;
+}
+
+export async function getAIStartSitAdvice(
+  playerA: ESPNPlayer,
+  playerB: ESPNPlayer
+): Promise<AIStartSitResponse> {
+  const { data } = await apiClient.post<AIStartSitResponse>(
+    "/espn/ai-start-sit",
+    { playerA, playerB }
+  );
+  return data;
+}

@@ -15,7 +15,7 @@ sleep 2
 
 # Start Flask service
 echo "▶️  Starting Flask ESPN service (port 5002)..."
-python3 app.py > flask.log 2>&1 &
+.venv/bin/python app.py > flask.log 2>&1 &
 FLASK_PID=$!
 sleep 3
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -335,4 +336,64 @@ func (h *ESPNHandler) GetFreeAgents(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, freeAgents)
+}
+
+type AIStartSitRequest struct {
+	PlayerA ESPNPlayer `json:"playerA" binding:"required"`
+	PlayerB ESPNPlayer `json:"playerB" binding:"required"`
+}
+
+type AIStartSitResponse struct {
+	Recommendation string  `json:"recommendation"` // "A" or "B"
+	Confidence     int     `json:"confidence"`     // 0-100
+	Reasoning      string  `json:"reasoning"`
+	PlayerAName    string  `json:"playerAName"`
+	PlayerBName    string  `json:"playerBName"`
+}
+
+// GetAIStartSitAdvice provides AI-powered start/sit recommendations
+func (h *ESPNHandler) GetAIStartSitAdvice(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req AIStartSitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+
+	// Call Flask service to get AI recommendation
+	flaskURL := fmt.Sprintf("%s/api/espn/ai-start-sit", h.flaskServiceURL)
+	
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal request"})
+		return
+	}
+
+	resp, err := http.Post(flaskURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to call AI service"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "AI service returned error: " + string(body),
+		})
+		return
+	}
+
+	var aiResp AIStartSitResponse
+	if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse AI response"})
+		return
+	}
+
+	c.JSON(http.StatusOK, aiResp)
 }
