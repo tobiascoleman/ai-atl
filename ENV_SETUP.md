@@ -36,22 +36,36 @@ PORT=8080
 
 # Environment
 ENV=development
+
+# Yahoo Fantasy Sports (optional, enables account linking)
+# Create credentials at https://developer.yahoo.com/fantasysports/guide/#register
+YAHOO_CLIENT_ID=your-yahoo-client-id
+YAHOO_CLIENT_SECRET=your-yahoo-client-secret
+# Callback must match your Yahoo app configuration
+YAHOO_REDIRECT_URL=http://localhost:8080/api/v1/fantasy/oauth/callback
+# Frontend URL used after successful linking
+CLIENT_APP_URL=http://localhost:3000
 ```
 
 ### 🔑 Required Values
 
-1. **MONGO_URI** 
+1. **MONGO_URI**
    - Local: `mongodb://localhost:27017/nfl_platform`
    - Atlas: Get from MongoDB Atlas dashboard
-   
-2. **JWT_SECRET** 
+2. **JWT_SECRET**
    - Any random string (for hackathon, anything works)
    - Example: `hackathon-2025-secret-key`
-   
 3. **GEMINI_API_KEY** ⭐ **MOST IMPORTANT**
+
    - Get free at: https://ai.google.dev/
    - Click "Get API Key" → Create in new project
    - Copy the key
+
+4. **Yahoo Fantasy Credentials (optional, required for new fantasy page)**
+   - Register an app in the [Yahoo Developer Portal](https://developer.yahoo.com/apps/)
+   - Enable Fantasy Sports API access and note the client ID/secret
+   - Set callback URL to `http://localhost:8080/api/v1/fantasy/oauth/callback`
+   - Update `CLIENT_APP_URL` if your frontend runs on a different host
 
 ---
 
@@ -127,6 +141,7 @@ go run cmd/api/main.go
 ```
 
 **Should see:**
+
 ```
 ✓ Connected to MongoDB
 ✓ Created indexes
@@ -134,6 +149,7 @@ go run cmd/api/main.go
 ```
 
 **If you see errors:**
+
 - `MongoDB connection failed` → Check MONGO_URI
 - `Gemini API key not set` → Check GEMINI_API_KEY
 - `JWT secret not set` → Check JWT_SECRET
@@ -146,12 +162,14 @@ npm run dev
 ```
 
 **Should see:**
+
 ```
 ✓ Ready in 2s
 ✓ Local: http://localhost:3000
 ```
 
 **Test API connection:**
+
 - Open http://localhost:3000
 - Try to register a user
 - Should work without CORS errors
@@ -165,13 +183,14 @@ npm run dev
 **Solutions:**
 
 1. **Using Local MongoDB?**
+
    ```bash
    # Install (Mac)
    brew install mongodb-community
-   
+
    # Start MongoDB
    brew services start mongodb-community
-   
+
    # Verify it's running
    mongosh
    ```
@@ -206,6 +225,7 @@ npm run dev
 ### Issue: "CORS error" in browser console
 
 **Solution:**
+
 - Backend has CORS middleware (already included)
 - Make sure frontend URL matches in backend CORS config
 - Restart both servers
@@ -266,6 +286,7 @@ git status | grep ".env"
 ```
 
 If you see `.env` files in git status:
+
 ```bash
 git rm --cached .env
 git rm --cached frontend/.env.local
@@ -310,4 +331,3 @@ curl http://localhost:8080/health
 ---
 
 **Once these files are created correctly, everything should work!** 🚀
-

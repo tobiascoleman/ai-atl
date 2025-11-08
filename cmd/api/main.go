@@ -10,6 +10,7 @@ import (
 	"github.com/ai-atl/nfl-platform/internal/config"
 	"github.com/ai-atl/nfl-platform/internal/handlers"
 	"github.com/ai-atl/nfl-platform/internal/middleware"
+	"github.com/ai-atl/nfl-platform/internal/services"
 	"github.com/ai-atl/nfl-platform/pkg/mongodb"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -43,6 +44,10 @@ func main() {
 	// Initialize Gin router
 	router := gin.Default()
 
+	db := mongoClient.Database(cfg.DBName)
+	yahooService := services.NewYahooService(db, cfg)
+	fantasyHandler := handlers.NewFantasyHandler(cfg, yahooService)
+
 	// Middleware
 	router.Use(middleware.CORS())
 	router.Use(middleware.RequestLogger())
@@ -62,20 +67,30 @@ func main() {
 		// Auth routes
 		auth := v1.Group("/auth")
 		{
-			authHandler := handlers.NewAuthHandler(mongoClient.Database(cfg.DBName))
+			authHandler := handlers.NewAuthHandler(db)
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
 		}
 
+		// Yahoo OAuth callback (public)
+		v1.GET("/fantasy/oauth/callback", fantasyHandler.Callback)
+
 		// Protected routes (require JWT)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthRequired())
 		{
+			fantasy := protected.Group("/fantasy")
+			{
+				fantasy.GET("/status", fantasyHandler.Status)
+				fantasy.GET("/oauth/url", fantasyHandler.GetAuthURL)
+				fantasy.GET("/teams", fantasyHandler.Teams)
+			}
+
 			// Players
 			players := protected.Group("/players")
 			{
-				playerHandler := handlers.NewPlayerHandler(mongoClient.Database(cfg.DBName))
+				playerHandler := handlers.NewPlayerHandler(db)
 				players.GET("", playerHandler.List)
 				players.GET("/:id", playerHandler.Get)
 				players.GET("/:id/stats", playerHandler.GetStats)
@@ -84,7 +99,7 @@ func main() {
 			// Lineups
 			lineups := protected.Group("/lineups")
 			{
-				lineupHandler := handlers.NewLineupHandler(mongoClient.Database(cfg.DBName))
+				lineupHandler := handlers.NewLineupHandler(db)
 				lineups.GET("", lineupHandler.List)
 				lineups.POST("", lineupHandler.Create)
 				lineups.GET("/:id", lineupHandler.Get)
@@ -96,7 +111,7 @@ func main() {
 			// Insights (AI-powered features)
 			insights := protected.Group("/insights")
 			{
-				insightHandler := handlers.NewInsightHandler(mongoClient.Database(cfg.DBName))
+				insightHandler := handlers.NewInsightHandler(db)
 				insights.GET("/game_script", insightHandler.GameScript)
 				insights.POST("/injury_impact", insightHandler.InjuryImpact)
 				insights.GET("/streaks", insightHandler.Streaks)
@@ -107,14 +122,14 @@ func main() {
 			// Trade Analyzer
 			trades := protected.Group("/trades")
 			{
-				tradeHandler := handlers.NewTradeHandler(mongoClient.Database(cfg.DBName))
+				tradeHandler := handlers.NewTradeHandler(db)
 				trades.POST("/analyze", tradeHandler.Analyze)
 			}
 
 			// Chatbot
 			chatbot := protected.Group("/chatbot")
 			{
-				chatbotHandler := handlers.NewChatbotHandler(mongoClient.Database(cfg.DBName))
+				chatbotHandler := handlers.NewChatbotHandler(db)
 				chatbot.POST("/ask", chatbotHandler.Ask)
 				chatbot.GET("/history", chatbotHandler.History)
 			}
@@ -122,7 +137,7 @@ func main() {
 			// Voting
 			votes := protected.Group("/votes")
 			{
-				voteHandler := handlers.NewVoteHandler(mongoClient.Database(cfg.DBName))
+				voteHandler := handlers.NewVoteHandler(db)
 				votes.POST("", voteHandler.Create)
 				votes.GET("/consensus", voteHandler.GetConsensus)
 			}
