@@ -13,6 +13,10 @@ export interface ESPNPlayer {
   position: string;
   proTeam: string;
   lineupSlot: string;
+  projectedPoints: number;
+  points: number;
+  injured: boolean;
+  injuryStatus?: string | null;
 }
 
 export interface ESPNStatusResponse {

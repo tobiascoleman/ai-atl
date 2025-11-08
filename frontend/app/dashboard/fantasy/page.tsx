@@ -443,17 +443,24 @@ export default function FantasyPage() {
                 <p className="text-sm font-medium text-gray-700">
                   Your ESPN Roster ({espnRoster.length} players):
                 </p>
-                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {espnRoster.map((player, idx) => (
                     <div
                       key={idx}
-                      className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition"
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">
-                            {player.name}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-gray-900">
+                              {player.name}
+                            </p>
+                            {player.injured && (
+                              <span className="text-xs font-medium text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                {player.injuryStatus || "INJ"}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">
                             {player.position} - {player.proTeam}
                           </p>
@@ -461,6 +468,21 @@ export default function FantasyPage() {
                         <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded">
                           {player.lineupSlot}
                         </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <div className="text-center flex-1">
+                          <p className="text-xs text-gray-500">Projected</p>
+                          <p className="text-lg font-bold text-orange-600">
+                            {player.projectedPoints.toFixed(1)}
+                          </p>
+                        </div>
+                        <div className="text-center flex-1 border-l border-gray-200">
+                          <p className="text-xs text-gray-500">Actual</p>
+                          <p className="text-lg font-bold text-gray-900">
+                            {player.points.toFixed(1)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}

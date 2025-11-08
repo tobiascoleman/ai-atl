@@ -37,15 +37,39 @@ def get_my_roster():
         if not team:
             return jsonify({'error': f'Team with ID {YOUR_TEAM_ID} not found'}), 404
         
-        # Create roster data list
+        # Get current week for projections
+        current_week = league.current_week
+        
+        # Create roster data list with projected and actual points
         roster_data = []
         for player in team.roster:
-            roster_data.append({
+            # Get projected points for current week
+            projected = 0
+            actual = 0
+            try:
+                if hasattr(player, 'stats') and current_week in player.stats:
+                    projected = player.stats[current_week].get('projected_points', 0)
+                    actual = player.stats[current_week].get('points', 0)
+                # Fallback to season averages
+                if projected == 0:
+                    projected = getattr(player, 'projected_avg_points', 0)
+                if actual == 0:
+                    actual = getattr(player, 'avg_points', 0)
+            except:
+                projected = getattr(player, 'projected_avg_points', 0)
+                actual = getattr(player, 'avg_points', 0)
+            
+            player_data = {
                 'name': player.name,
                 'position': player.position,
                 'proTeam': player.proTeam,
-                'lineupSlot': player.lineupSlot
-            })
+                'lineupSlot': player.lineupSlot,
+                'projectedPoints': projected,
+                'points': actual,
+                'injured': getattr(player, 'injured', False),
+                'injuryStatus': getattr(player, 'injuryStatus', None),
+            }
+            roster_data.append(player_data)
         
         return jsonify(roster_data)
     
