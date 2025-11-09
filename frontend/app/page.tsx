@@ -1,5 +1,5 @@
-import Link from 'next/link'
-import { Activity, Brain, TrendingUp, Users } from 'lucide-react'
+import Link from "next/link";
+import { Activity, Brain, TrendingUp, Users } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -11,7 +11,8 @@ export default function HomePage() {
             AI-Powered NFL Fantasy
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Predict game flow, optimize lineups, and dominate your league with AI insights
+            Predict game flow, optimize lineups, and dominate your league with
+            AI insights
           </p>
           <div className="flex gap-4 justify-center">
             <Link
@@ -30,7 +31,7 @@ export default function HomePage() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mt-16">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mt-16">
           <FeatureCard
             icon={<Brain className="w-12 h-12 text-blue-600" />}
             title="AI Game Script Predictor"
@@ -46,15 +47,10 @@ export default function HomePage() {
             title="Smart Recommendations"
             description="AI chatbot provides personalized lineup and waiver advice"
           />
-          <FeatureCard
-            icon={<Users className="w-12 h-12 text-orange-600" />}
-            title="Community Insights"
-            description="See what the community thinks about player predictions"
-          />
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function FeatureCard({
@@ -62,16 +58,15 @@ function FeatureCard({
   title,
   description,
 }: {
-  icon: React.ReactNode
-  title: string
-  description: string
+  icon: React.ReactNode;
+  title: string;
+  description: string;
 }) {
   return (
     <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition">
       <div className="mb-4">{icon}</div>
-      <h3 className="text-xl font-bold mb-2">{title}</h3>
+      <h3 className="text-xl font-bold mb-2 text-gray-900">{title}</h3>
       <p className="text-gray-600">{description}</p>
     </div>
-  )
+  );
 }
-

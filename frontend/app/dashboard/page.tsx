@@ -1,34 +1,36 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { Brain, TrendingUp, Users, Zap } from 'lucide-react'
-import Link from 'next/link'
-import { statsAPI, DashboardStats } from '@/lib/api/stats'
+import { useEffect, useState } from "react";
+import { Brain, TrendingUp, Users, Zap } from "lucide-react";
+import Link from "next/link";
+import { statsAPI, DashboardStats } from "@/lib/api/stats";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await statsAPI.getDashboardStats()
-        setStats(data)
+        const data = await statsAPI.getDashboardStats();
+        setStats(data);
       } catch (error) {
-        console.error('Failed to fetch dashboard stats:', error)
+        console.error("Failed to fetch dashboard stats:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchStats()
-  }, [])
+    fetchStats();
+  }, []);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Your AI-powered fantasy command center</p>
+        <p className="text-gray-600 mt-2">
+          Your AI-powered fantasy command center
+        </p>
       </div>
 
       {/* Quick Actions */}
@@ -48,10 +50,10 @@ export default function DashboardPage() {
           color="bg-purple-50"
         />
         <QuickActionCard
-          href="/dashboard/trades"
+          href="/dashboard/fantasy"
           icon={<TrendingUp className="w-8 h-8 text-green-600" />}
-          title="Trade Analyzer"
-          description="Evaluate trades"
+          title="Fantasy Central"
+          description="Manage your team"
           color="bg-green-50"
         />
         <QuickActionCard
@@ -117,7 +119,7 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function QuickActionCard({
@@ -127,24 +129,26 @@ function QuickActionCard({
   description,
   color,
 }: {
-  href: string
-  icon: React.ReactNode
-  title: string
-  description: string
-  color: string
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  color: string;
 }) {
   return (
     <Link
       href={href}
       className="block bg-white rounded-xl shadow-sm hover:shadow-md transition p-6"
     >
-      <div className={`w-16 h-16 ${color} rounded-lg flex items-center justify-center mb-4`}>
+      <div
+        className={`w-16 h-16 ${color} rounded-lg flex items-center justify-center mb-4`}
+      >
         {icon}
       </div>
-      <h3 className="font-bold text-lg mb-1">{title}</h3>
+      <h3 className="font-bold text-lg mb-1 text-gray-900">{title}</h3>
       <p className="text-gray-600 text-sm">{description}</p>
     </Link>
-  )
+  );
 }
 
 function StatCard({
@@ -152,9 +156,9 @@ function StatCard({
   value,
   subtitle,
 }: {
-  title: string
-  value: string
-  subtitle: string
+  title: string;
+  value: string;
+  subtitle: string;
 }) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -162,7 +166,7 @@ function StatCard({
       <p className="text-3xl font-bold text-gray-900 mb-2">{value}</p>
       <p className="text-sm text-gray-500">{subtitle}</p>
     </div>
-  )
+  );
 }
 
 function StatCardSkeleton() {
@@ -172,10 +176,16 @@ function StatCardSkeleton() {
       <div className="h-8 bg-gray-200 rounded w-32 mb-2"></div>
       <div className="h-4 bg-gray-200 rounded w-20"></div>
     </div>
-  )
+  );
 }
 
-function TipItem({ title, description }: { title: string; description: string }) {
+function TipItem({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
       <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
@@ -184,6 +194,5 @@ function TipItem({ title, description }: { title: string; description: string })
         <p className="text-gray-600 text-sm">{description}</p>
       </div>
     </div>
-  )
+  );
 }
-

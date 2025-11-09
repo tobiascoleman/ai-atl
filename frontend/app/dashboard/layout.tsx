@@ -99,7 +99,7 @@ export default function DashboardLayout({
                 <NavItem
                   href="/dashboard/insights"
                   icon={<Brain size={20} />}
-                  label="AI Insights"
+                  label="AI Game Script"
                 />
                 <NavItem
                   href="/dashboard/chat"
@@ -109,7 +109,7 @@ export default function DashboardLayout({
                 <NavItem
                   href="/dashboard/fantasy"
                   icon={<Trophy size={20} />}
-                  label="Fantasy"
+                  label="Fantasy Central"
                 />
                 <NavItem
                   href="/dashboard/players"
