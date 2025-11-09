@@ -25,13 +25,14 @@ export default function InsightsPage() {
       setSelectedGame('') // Reset selection when week changes
       try {
         const scheduledGames = await gamesAPI.getScheduledGames(season, week)
-        setGames(scheduledGames)
+        setGames(scheduledGames || []) // Ensure it's always an array
         // Auto-select first game if available
-        if (scheduledGames.length > 0) {
+        if (scheduledGames && scheduledGames.length > 0) {
           setSelectedGame(scheduledGames[0].game_id)
         }
       } catch (err) {
         console.error('Failed to fetch games:', err)
+        setGames([]) // Set empty array on error
       } finally {
         setLoadingGames(false)
       }
@@ -95,7 +96,7 @@ export default function InsightsPage() {
               <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
                 Loading games...
               </div>
-            ) : games.length > 0 ? (
+            ) : games && games.length > 0 ? (
               <select
                 id="game-selector"
                 value={selectedGame}

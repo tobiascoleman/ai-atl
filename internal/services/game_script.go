@@ -67,6 +67,13 @@ func (s *GameScriptService) PredictGameScript(ctx context.Context, gameID string
 	// Build comprehensive context with real database data
 	prompt := s.buildGameScriptPrompt(game, homeTeamContext, awayTeamContext, historicalContext, homeAwayContext)
 
+	// Log the first 2000 characters of the prompt to see what player data is included
+	promptPreview := prompt
+	if len(prompt) > 2000 {
+		promptPreview = prompt[:2000] + "..."
+	}
+	log.Printf("🤖 AI Prompt preview (first 2000 chars):\n%s", promptPreview)
+
 	// Get AI prediction
 	response, err := s.gemini.GenerateWithRetry(ctx, prompt, 3)
 	if err != nil {
@@ -415,22 +422,29 @@ func (s *GameScriptService) fetchHomeAwaySplits(ctx context.Context, homeTeam, a
 	homeGames, homeWins, homePointsFor, homePointsAgainst := s.getTeamRecord(ctx, homeTeam, season, true)
 	awayGames, awayWins, awayPointsFor, awayPointsAgainst := s.getTeamRecord(ctx, awayTeam, season, false)
 
+	log.Printf("📊 Home/Away splits - %s home: %d-%d, %s away: %d-%d",
+		homeTeam, homeWins, homeGames-homeWins, awayTeam, awayWins, awayGames-awayWins)
+
 	if homeGames == 0 && awayGames == 0 {
-		return ""
+		return "\n**Note:** No completed games found for this season yet. Analysis will rely on roster strength and Vegas lines.\n"
 	}
 
-	context := fmt.Sprintf("\n**Home/Away Performance (2025):**\n")
+	context := fmt.Sprintf("\n**Home/Away Performance (%d Season):**\n", season)
 	if homeGames > 0 {
 		context += fmt.Sprintf("- %s at HOME: %d-%d (Avg: %.1f pts/game for, %.1f against)\n",
 			homeTeam, homeWins, homeGames-homeWins,
 			float64(homePointsFor)/float64(homeGames),
 			float64(homePointsAgainst)/float64(homeGames))
+	} else {
+		context += fmt.Sprintf("- %s at HOME: No completed home games yet this season\n", homeTeam)
 	}
 	if awayGames > 0 {
 		context += fmt.Sprintf("- %s on ROAD: %d-%d (Avg: %.1f pts/game for, %.1f against)\n",
 			awayTeam, awayWins, awayGames-awayWins,
 			float64(awayPointsFor)/float64(awayGames),
 			float64(awayPointsAgainst)/float64(awayGames))
+	} else {
+		context += fmt.Sprintf("- %s on ROAD: No completed road games yet this season\n", awayTeam)
 	}
 
 	return context
@@ -482,68 +496,71 @@ func (s *GameScriptService) getTeamRecord(ctx context.Context, team string, seas
 func (s *GameScriptService) buildGameScriptPrompt(game models.Game, homeTeamContext, awayTeamContext, historicalContext, homeAwayContext string) string {
 	return fmt.Sprintf(`Analyze this NFL matchup and predict the game script:
 
-**Game:** %s (Away) @ %s (Home)
-**Vegas Line:** %s %.1f (negative = home team favored)
-**Over/Under:** %.1f
-**Start Time:** %s
-**Week:** %d
+	**Game:** %s (Away) @ %s (Home)
+	**Vegas Line:** %s %.1f (negative = home team favored)
+	**Over/Under:** %.1f
+	**Start Time:** %s
+	**Week:** %d
 
-%s
+	%s
 
-%s
+	%s
 
-%s
+	%s
 
-%s
+	%s
 
-**Analysis Instructions:**
+	**Analysis Instructions:**
 
-1. **Focus on STARTERS & HIGH-USAGE PLAYERS**: 
-   - Players are ranked by FANTASY POINTS PER GAME, not career totals
-   - Look at the "fantasy pts/game" average - this shows current season performance
-   - Players with higher pts/game averages are the actual starters getting opportunities
-   - Games played shown next to each player (e.g., "STARTER, 8 games")
+	1. **Focus on STARTERS & HIGH-USAGE PLAYERS**: 
+	- Players are ranked by FANTASY POINTS PER GAME, not career totals
+	- Look at the "fantasy pts/game" average - this shows current season performance
+	- Players with higher pts/game averages are the actual starters getting opportunities
+	- Games played shown next to each player (e.g., "STARTER, 8 games")
 
-2. **Use Per-Game Performance**:
-   - Compare fantasy pts/game averages to assess true workload
-   - A player with 12 pts/game over 8 games is more relevant than one with 20 total pts over 2 games
-   - Consider consistency: steady performers vs boom/bust players
+	2. **Use Per-Game Performance**:
+	- Compare fantasy pts/game averages to assess true workload
+	- A player with 12 pts/game over 8 games is more relevant than one with 20 total pts over 2 games
+	- Consider consistency: steady performers vs boom/bust players
 
-3. **Leverage Historical Context**:
-   - Recent head-to-head results show scoring trends between these teams
-   - Home/away splits reveal team performance in different venues
-   - Factor these patterns into your game script prediction
+	3. **Leverage Historical Context**:
+	- Recent head-to-head results show scoring trends between these teams
+	- Home/away splits reveal team performance in different venues
+	- Factor these patterns into your game script prediction
 
-4. **Game Script Prediction**:
-   Based on Vegas lines, team trends, and home/away splits:
-   - Will this be competitive, a blowout, or defensive struggle?
-   - Which team will likely be playing from ahead/behind?
-   - How does this affect pass/run ratios?
+	4. **Game Script Prediction**:
+	Based on Vegas lines, team trends, and home/away splits:
+	- Will this be competitive, a blowout, or defensive struggle?
+	- Which team will likely be playing from ahead/behind?
+	- How does this affect pass/run ratios?
 
-5. **Player Impact Analysis** (TOP STARTERS ONLY):
-   - Who benefits from expected game script?
-   - Reference their actual pts/game average and recent performance
-   - Project specific opportunity increases (more targets, carries, attempts)
+	5. **Player Impact Analysis** (TOP STARTERS ONLY):
+	- Who benefits from expected game script?
+	- **USE THE EXACT PLAYER NAMES PROVIDED ABOVE** - DO NOT use placeholders like "[Insert X Name]"
+	- Reference their actual pts/game average and recent performance
+	- Project specific opportunity increases (more targets, carries, attempts)
 
-**CRITICAL RULES:**
-- **DO NOT mention ANY players not explicitly listed above** - the roster is filtered for active, healthy players only
-- **Players listed have been filtered to exclude injured/inactive players** - if someone isn't listed, they're not available
-- ONLY reference players with (STARTER) or (BACKUP) labels shown above
-- Focus on players with HIGH fantasy pts/game averages (they're the actual starters)
-- If you're unsure about a player, DO NOT mention them - stick to the provided roster
-- Use the HOME/AWAY splits and HISTORICAL data to inform predictions
-- Reference actual numbers from the data (pts/game, team scoring averages, etc.)
+	**CRITICAL RULES:**
+	- **ALWAYS USE ACTUAL PLAYER NAMES from the roster data above** - NEVER use placeholders like "[Insert CHI QB Name]" or "[NYG WR1]"
+	- **DO NOT mention ANY players not explicitly listed above** - the roster is filtered for active, healthy players only
+	- **Players listed have been filtered to exclude injured/inactive players** - if someone isn't listed, they're not available
+	- ONLY reference players with (STARTER) or (BACKUP) labels shown above
+	- Focus on players with HIGH fantasy pts/game averages (they're the actual starters)
+	- Copy player names EXACTLY as they appear in the roster sections (e.g., "Caleb Williams", "Saquon Barkley")
+	- If you're unsure about a player, DO NOT mention them - stick to the provided roster
+	- Use the HOME/AWAY splits and HISTORICAL data to inform predictions
+	- Reference actual numbers from the data (pts/game, team scoring averages, etc.)
 
-**ROSTER DATA ACCURACY:**
-The player lists above have been filtered to remove:
-- Injured players (IR, PUP, Out status)
-- Players who haven't played in recent weeks
-- Inactive or practice squad players
-- **Mid-season trades are not always reflected - only reference players explicitly shown for each team**
+	**ROSTER DATA ACCURACY:**
+	The player lists above have been filtered to remove:
+	- Injured players (IR, PUP, Out status)
+	- Players who haven't played in recent weeks
+	- Inactive or practice squad players
+	- **Mid-season trades are not always reflected - only reference players explicitly shown for each team**
 
-If a notable player you'd expect to see is missing from the roster, they are either injured, traded, or inactive. Do not mention them.
+	If a notable player you'd expect to see is missing from the roster, they are either injured, traded, or inactive. Do not mention them.
 
-**Format:** Use clear markdown with ## headers and bullet points. Be specific and actionable.`,
+	**Format:** Use clear markdown with ## headers and bullet points. Be specific and actionable.`,
 		game.AwayTeam,
 		game.HomeTeam,
 		game.HomeTeam,
