@@ -169,7 +169,7 @@ func (s *WaiverWireService) FindPersonalizedWaiverGems(ctx context.Context, rost
 	if searchPosition == "" || searchPosition == "ALL" {
 		searchPosition = "ALL"
 	}
-	
+
 	allGems, err := s.FindWaiverGems(ctx, searchPosition, 30)
 	if err != nil {
 		return nil, err

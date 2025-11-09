@@ -28,7 +28,8 @@ fi
 
 # Start Go API
 echo "▶️  Starting Go API backend (port 8080)..."
-go run ./cmd/api/main.go > api.log 2>&1 &
+# Load environment variables from .env file and pass to Go process
+env $(grep -v '^#' .env | xargs) go run ./cmd/api/main.go > api.log 2>&1 &
 GO_PID=$!
 sleep 4
 
@@ -42,7 +43,7 @@ fi
 # Start Next.js
 echo "▶️  Starting Next.js frontend (port 3000)..."
 cd frontend
-npm run dev > ../frontend.log 2>&1 &
+(unset PORT && npm run dev) > ../frontend.log 2>&1 &
 NEXT_PID=$!
 cd ..
 sleep 5
