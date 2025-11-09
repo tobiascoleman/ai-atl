@@ -190,9 +190,6 @@ export default function PlayersPage() {
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{player.name}</div>
-                        {!player.is_current_player && (
-                          <div className="text-xs text-gray-500">Season {player.season}</div>
-                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
@@ -208,6 +205,7 @@ export default function PlayersPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const status = player.status_description || 'Active'
+                          const isRetired = status.includes('Retired')
                           const isInjured = player.status === 'INA' || 
                                           status.includes('Injured') || 
                                           status.includes('PUP') ||
@@ -217,7 +215,8 @@ export default function PlayersPage() {
                           const isSuspended = status.includes('Suspended')
                           
                           let colorClass = 'bg-green-100 text-green-800' // Active
-                          if (isInjured) colorClass = 'bg-red-100 text-red-800'
+                          if (isRetired) colorClass = 'bg-gray-100 text-gray-700'
+                          else if (isInjured) colorClass = 'bg-red-100 text-red-800'
                           else if (isWaived) colorClass = 'bg-orange-100 text-orange-800'
                           else if (isSuspended) colorClass = 'bg-purple-100 text-purple-800'
                           else if (isPracticeSquad) colorClass = 'bg-blue-100 text-blue-800'
