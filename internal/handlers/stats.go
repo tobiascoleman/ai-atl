@@ -28,53 +28,80 @@ type DashboardStats struct {
 	CurrentSeasonYear int   `json:"current_season_year"`
 }
 
-// GetDashboardStats returns real statistics from the database
+// GetDashboardStats returns statistics from the database (optimized with estimated counts)
 func (h *StatsHandler) GetDashboardStats(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second) // Reduced timeout
 	defer cancel()
 
 	stats := DashboardStats{
 		CurrentSeasonYear: 2025,
+		ActiveTeams:       32, // NFL has 32 teams (static)
 	}
 
-	// Count total unique players (across all seasons)
-	pipeline := mongo.Pipeline{
-		bson.D{{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: "$nfl_id"},
-		}}},
-		bson.D{{Key: "$count", Value: "total"}},
+	// PERFORMANCE: Run counts in parallel using goroutines
+	type countResult struct {
+		key   string
+		count int64
+		err   error
 	}
-	cursor, err := h.db.Collection("players").Aggregate(ctx, pipeline)
-	if err == nil {
-		var result []bson.M
-		if err := cursor.All(ctx, &result); err == nil && len(result) > 0 {
-			if total, ok := result[0]["total"].(int32); ok {
-				stats.TotalPlayers = int64(total)
+
+	resultsChan := make(chan countResult, 5)
+
+	// Count total unique players (most recent season only - much faster!)
+	go func() {
+		count, err := h.db.Collection("players").CountDocuments(ctx, bson.M{"season": 2025})
+		resultsChan <- countResult{"players", count, err}
+	}()
+
+	// Count total games (use estimatedDocumentCount for speed)
+	go func() {
+		count, err := h.db.Collection("games").EstimatedDocumentCount(ctx)
+		resultsChan <- countResult{"games", count, err}
+	}()
+
+	// Count plays collection (estimated for speed)
+	go func() {
+		count, err := h.db.Collection("play_by_play").EstimatedDocumentCount(ctx)
+		resultsChan <- countResult{"plays", count, err}
+	}()
+
+	// Count injured players (indexed query)
+	go func() {
+		injuryFilter := bson.M{
+			"season": 2025,
+			"$or": []bson.M{
+				{"status": "INA"},
+				{"status_description_abbr": bson.M{"$in": []string{"R01", "R04", "R48", "P02"}}},
+			},
+		}
+		count, err := h.db.Collection("players").CountDocuments(ctx, injuryFilter)
+		resultsChan <- countResult{"injured", count, err}
+	}()
+
+	// Count NGS entries (estimated for speed)
+	go func() {
+		count, err := h.db.Collection("next_gen_stats").EstimatedDocumentCount(ctx)
+		resultsChan <- countResult{"ngs", count, err}
+	}()
+
+	// Collect results from goroutines
+	for i := 0; i < 5; i++ {
+		result := <-resultsChan
+		if result.err == nil {
+			switch result.key {
+			case "players":
+				stats.TotalPlayers = result.count
+			case "games":
+				stats.TotalGames = result.count
+			case "plays":
+				stats.TotalPlays = result.count
+			case "injured":
+				stats.InjuredPlayers = result.count
+			case "ngs":
+				stats.NextGenStats = result.count
 			}
 		}
 	}
-
-	// Count total games
-	stats.TotalGames, _ = h.db.Collection("games").CountDocuments(ctx, bson.M{})
-
-	// Count total plays
-	stats.TotalPlays, _ = h.db.Collection("plays").CountDocuments(ctx, bson.M{})
-
-	// Count injured players (current season)
-	injuryFilter := bson.M{
-		"season": 2025,
-		"$or": []bson.M{
-			{"status": "INA"},
-			{"status_description_abbr": bson.M{"$in": []string{"R01", "R04", "R48", "P02"}}},
-		},
-	}
-	stats.InjuredPlayers, _ = h.db.Collection("players").CountDocuments(ctx, injuryFilter)
-
-	// Count Next Gen Stats entries
-	stats.NextGenStats, _ = h.db.Collection("next_gen_stats").CountDocuments(ctx, bson.M{})
-
-	// Count active teams
-	stats.ActiveTeams, _ = h.db.Collection("teams").CountDocuments(ctx, bson.M{})
 
 	c.JSON(http.StatusOK, stats)
 }

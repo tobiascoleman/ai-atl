@@ -14,7 +14,7 @@ export const playersAPI = {
   }) => {
     const { data } = await apiClient.get<{
       players: Player[]
-      total: number
+      count: number
       page: number
       limit: number
     }>('/players', { params })

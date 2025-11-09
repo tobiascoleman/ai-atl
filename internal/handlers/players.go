@@ -66,17 +66,20 @@ func (h *PlayerHandler) List(c *gin.Context) {
 		matchFilter["position"] = position
 	}
 
-	// Search filter (name search)
+	// Search by name (case-insensitive regex) - BACKEND SEARCH for performance
 	if search := c.Query("search"); search != "" {
-		matchFilter["name"] = bson.M{"$regex": search, "$options": "i"}
+		matchFilter["name"] = bson.M{
+			"$regex":   search,
+			"$options": "i", // case-insensitive
+		}
 	}
 
 	// Pagination
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limitNum, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	skip := (page - 1) * limitNum
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	skip := (page - 1) * limit
 
-	// Sorting
+	// Sorting - use 'name' as default since it's indexed
 	sortField := c.DefaultQuery("sort", "name")
 	sortOrder := 1
 	if c.Query("order") == "desc" {
@@ -85,7 +88,7 @@ func (h *PlayerHandler) List(c *gin.Context) {
 
 	// Aggregation pipeline to get unique players with their most recent season
 	pipeline := mongo.Pipeline{
-		// Match filters
+		// Match filters (uses indexes!)
 		{{Key: "$match", Value: matchFilter}},
 		// Sort by season descending to get most recent first
 		{{Key: "$sort", Value: bson.D{{Key: "season", Value: -1}}}},
@@ -96,11 +99,11 @@ func (h *PlayerHandler) List(c *gin.Context) {
 		}}},
 		// Replace root with the document
 		{{Key: "$replaceRoot", Value: bson.D{{Key: "newRoot", Value: "$doc"}}}},
-		// Sort by name (or other field)
+		// Sort by name (or other field) - uses name index!
 		{{Key: "$sort", Value: bson.D{{Key: sortField, Value: sortOrder}}}},
 		// Pagination
 		{{Key: "$skip", Value: skip}},
-		{{Key: "$limit", Value: limitNum}},
+		{{Key: "$limit", Value: limit}},
 	}
 
 	cursor, err := collection.Aggregate(ctx, pipeline)
@@ -118,40 +121,52 @@ func (h *PlayerHandler) List(c *gin.Context) {
 		return
 	}
 
-	// Enrich players with stats (but NOT EPA - too slow to calculate per player)
+	// PERFORMANCE FIX: Batch fetch all stats in ONE query instead of N queries!
+	// Build list of nfl_ids to query
+	nflIDs := make([]string, len(players))
+	playerMap := make(map[string]models.Player) // key: nfl_id_season
+
+	for i, player := range players {
+		nflIDs[i] = player.NFLID
+		key := player.NFLID + "_" + strconv.Itoa(player.Season)
+		playerMap[key] = player
+	}
+
+	// Single batch query for all stats (uses nfl_id+season index!)
+	statsFilter := bson.M{
+		"nfl_id":      bson.M{"$in": nflIDs},
+		"season_type": "REGPOST",
+	}
+
+	statsCursor, err := h.db.Collection("player_stats").Find(ctx, statsFilter)
+	if err != nil {
+		log.Printf("❌ Failed to fetch stats: %v", err)
+	}
+	defer statsCursor.Close(ctx)
+
+	// Build stats lookup map
+	statsMap := make(map[string]models.PlayerStats) // key: nfl_id_season
+	var allStats []models.PlayerStats
+	if err := statsCursor.All(ctx, &allStats); err == nil {
+		for _, stat := range allStats {
+			key := stat.NFLID + "_" + strconv.Itoa(stat.Season)
+			statsMap[key] = stat
+		}
+	}
+
+	// Enrich players with stats (fast O(1) lookups!)
 	enrichedPlayers := make([]PlayerWithStats, 0, len(players))
 	for _, player := range players {
 		enriched := PlayerWithStats{
 			Player:            player,
 			IsCurrentPlayer:   player.Season == 2025,
-			AvgEPA:            0, // EPA calculation removed for performance
+			AvgEPA:            0,
 			StatusDescription: models.GetPlayerStatusDescription(player.Status, player.StatusDescriptionAbbr),
 		}
 
-		// Get latest season stats - NFLverse uses "REGPOST" for combined regular + postseason
-		var stats models.PlayerStats
-
-		err := h.db.Collection("player_stats").FindOne(
-			ctx,
-			bson.M{
-				"nfl_id":      player.NFLID,
-				"season":      player.Season,
-				"season_type": "REGPOST",
-			},
-		).Decode(&stats)
-
-		// If REGPOST not found, try without season_type filter as fallback
-		if err != nil {
-			err = h.db.Collection("player_stats").FindOne(
-				ctx,
-				bson.M{
-					"nfl_id": player.NFLID,
-					"season": player.Season,
-				},
-			).Decode(&stats)
-		}
-
-		if err == nil {
+		// O(1) lookup instead of N database queries!
+		key := player.NFLID + "_" + strconv.Itoa(player.Season)
+		if stats, found := statsMap[key]; found {
 			// Offensive Stats
 			enriched.PassingYards = stats.PassingYards
 			enriched.PassingTDs = stats.PassingTDs
@@ -170,19 +185,20 @@ func (h *PlayerHandler) List(c *gin.Context) {
 			enriched.PassDefended = stats.PassDefended
 			enriched.ForcedFumbles = stats.ForcedFumbles
 			enriched.FumbleRecoveries = stats.FumbleRecoveries
+
+			// Store EPA for frontend
+			enriched.AvgEPA = stats.EPA
 		}
 
 		enrichedPlayers = append(enrichedPlayers, enriched)
 	}
 
-	// Get total count
-	total, _ := collection.CountDocuments(ctx, matchFilter)
-
+	// Return enriched players (not raw players!)
 	c.JSON(http.StatusOK, gin.H{
 		"players": enrichedPlayers,
-		"total":   total,
+		"count":   len(enrichedPlayers),
 		"page":    page,
-		"limit":   limitNum,
+		"limit":   limit,
 	})
 }
 
