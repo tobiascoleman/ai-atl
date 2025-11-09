@@ -314,7 +314,7 @@ function LifetimeView({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <MetricCard
-              label="Career Avg EPA"
+              label="Career EPA"
               value={detailData.lifetime_epa.toFixed(3)}
               description="Expected Points Added per play"
               color={detailData.lifetime_epa > 0 ? "green" : "red"}
@@ -569,7 +569,7 @@ function SeasonView({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <MetricCard
-              label="Season Avg EPA"
+              label="Season EPA"
               value={detailData.epa_by_season[selectedSeason].epa.toFixed(3)}
               description="Expected Points Added per play"
               color={
