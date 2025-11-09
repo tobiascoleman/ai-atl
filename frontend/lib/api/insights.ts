@@ -30,8 +30,18 @@ export const insightsAPI = {
     return data
   },
 
-  getWaiverGems: async (): Promise<{ gems: WaiverGem[] }> => {
-    const { data } = await apiClient.get<{ gems: WaiverGem[] }>('/insights/waiver_gems')
+  getWaiverGems: async (position: string = 'ALL'): Promise<{ gems: WaiverGem[]; count: number }> => {
+    const { data} = await apiClient.get<{ gems: WaiverGem[]; count: number }>(
+      `/insights/waiver_gems?position=${position}`
+    )
+    return data
+  },
+
+  getPersonalizedWaiverGems: async (roster: any[]): Promise<{ gems: WaiverGem[]; count: number }> => {
+    const { data } = await apiClient.post<{ gems: WaiverGem[]; count: number }>(
+      '/insights/personalized_waiver_gems',
+      { roster }
+    )
     return data
   },
 }

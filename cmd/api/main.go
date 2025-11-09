@@ -168,9 +168,8 @@ func main() {
 				insights.GET("/streaks", insightHandler.Streaks)
 				insights.GET("/top_performers", insightHandler.TopPerformers)
 				insights.GET("/waiver_gems", insightHandler.WaiverGems)
-			}
-
-			// Trade Analyzer
+				insights.POST("/personalized_waiver_gems", insightHandler.PersonalizedWaiverGems)
+			} // Trade Analyzer
 			trades := protected.Group("/trades")
 			{
 				tradeHandler := handlers.NewTradeHandler(db)

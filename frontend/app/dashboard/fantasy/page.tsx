@@ -21,7 +21,8 @@ import {
   FreeAgentPlayer,
   AIStartSitResponse,
 } from "@/lib/api/espn";
-import { FantasyStatusResponse, YahooTeam } from "@/types/api";
+import { insightsAPI } from "@/lib/api/insights";
+import { FantasyStatusResponse, YahooTeam, WaiverGem } from "@/types/api";
 
 export default function FantasyPage() {
   const searchParams = useSearchParams();
@@ -58,6 +59,12 @@ export default function FantasyPage() {
     playerA: null,
     playerB: null,
   });
+  
+  // Waiver Wire AI Scout state
+  const [waiverGems, setWaiverGems] = useState<WaiverGem[]>([]);
+  const [waiverPosition, setWaiverPosition] = useState<string>("ALL");
+  const [showWaiverGems, setShowWaiverGems] = useState(false);
+  const [waiverLoading, setWaiverLoading] = useState(false);
 
   const connectedQuery = useMemo(
     () => searchParams?.get("connected"),
@@ -200,6 +207,37 @@ export default function FantasyPage() {
     setComparingPlayers({ playerA: null, playerB: null });
     setAiAdvice(null);
     setShowAIModal(false);
+  };
+
+  const loadWaiverGems = async (position: string = "ALL") => {
+    setWaiverLoading(true);
+    setEspnError(null);
+    try {
+      // If we have ESPN roster data, get personalized recommendations
+      if (espnRoster && espnRoster.length > 0) {
+        const rosterData = espnRoster.map(player => ({
+          name: player.name,
+          position: player.position,
+          projectedPoints: player.projectedPoints,
+          lineupSlot: player.lineupSlot,
+        }));
+        
+        const result = await insightsAPI.getPersonalizedWaiverGems(rosterData);
+        setWaiverGems(result.gems);
+        setShowWaiverGems(true);
+      } else {
+        // Fallback to generic recommendations
+        const result = await insightsAPI.getWaiverGems(position);
+        setWaiverGems(result.gems);
+        setShowWaiverGems(true);
+      }
+    } catch (err: any) {
+      console.error("Waiver gems error:", err);
+      const errorMsg = err?.response?.data?.error || err?.message || "Failed to load waiver wire gems.";
+      setEspnError(errorMsg);
+    } finally {
+      setWaiverLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -935,6 +973,155 @@ export default function FantasyPage() {
                       className="mt-3 text-sm text-green-700 hover:text-green-900 underline"
                     >
                       Hide Free Agents
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Waiver Wire AI Scout Section */}
+            {!espnLoading && espnConnected && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                      🔮 Waiver Wire AI Scout
+                      {espnRoster && espnRoster.length > 0 && (
+                        <span className="text-xs font-normal text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                          Personalized for Your Team
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {espnRoster && espnRoster.length > 0 
+                        ? "AI recommendations tailored to your roster needs"
+                        : "AI-powered breakout candidate finder"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={waiverPosition}
+                      onChange={(e) => setWaiverPosition(e.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                      disabled={waiverLoading}
+                    >
+                      <option value="ALL">All Positions</option>
+                      <option value="QB">QB</option>
+                      <option value="RB">RB</option>
+                      <option value="WR">WR</option>
+                      <option value="TE">TE</option>
+                    </select>
+                    <button
+                      onClick={() => loadWaiverGems(waiverPosition)}
+                      disabled={waiverLoading}
+                      className="rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-medium text-white hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
+                    >
+                      {waiverLoading ? "Analyzing..." : "🔍 Find Hidden Gems"}
+                    </button>
+                  </div>
+                </div>
+
+                {showWaiverGems && waiverGems && waiverGems.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-700">
+                      <strong>{waiverGems.length} breakout candidates</strong> found with AI analysis:
+                    </p>
+                    <div className="grid gap-4">
+                      {waiverGems.map((gem, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm hover:shadow-md transition"
+                        >
+                          {/* Header */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-1">
+                                <h4 className="text-lg font-bold text-gray-900">{gem.playerName}</h4>
+                                <span className="text-xs font-semibold text-indigo-700 bg-indigo-100 px-2 py-1 rounded">
+                                  {gem.position}
+                                </span>
+                                <span className="text-xs text-gray-600">{gem.team}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-purple-700">
+                                  {gem.recommendation}
+                                </span>
+                                {gem.trendingUp && (
+                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                    📈 Trending Up
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">Breakout Score</p>
+                              <p className="text-3xl font-bold text-indigo-600">{gem.breakoutScore.toFixed(0)}</p>
+                              <p className="text-xs text-gray-500">/100</p>
+                            </div>
+                          </div>
+
+                          {/* Key Metrics Grid */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 p-3 bg-white/60 rounded-lg">
+                            <div className="text-center">
+                              <p className="text-xs text-gray-500">Snap %</p>
+                              <p className="text-lg font-bold text-gray-900">
+                                {gem.snapCountPct > 0 ? `${gem.snapCountPct.toFixed(0)}%` : 'N/A'}
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-500">EPA/Play</p>
+                              <p className="text-lg font-bold text-gray-900">
+                                {gem.epaPerPlay > 0 ? gem.epaPerPlay.toFixed(3) : 'N/A'}
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-500">Target Trend</p>
+                              <p className="text-sm font-semibold text-gray-900 capitalize">{gem.targetShareTrend}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-500">Schedule</p>
+                              <p className="text-sm font-semibold text-gray-900 capitalize">{gem.upcomingSchedule}</p>
+                            </div>
+                          </div>
+
+                          {/* Opportunity Badge */}
+                          {gem.depthChartStatus && gem.depthChartStatus !== "Normal role" && (
+                            <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                              <p className="text-sm text-yellow-800">
+                                ⚡ <strong>Opportunity:</strong> {gem.depthChartStatus}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Recent Games */}
+                          {gem.lastThreeGames && gem.lastThreeGames.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs font-medium text-gray-700 mb-2">Last 3 Games:</p>
+                              <div className="space-y-1">
+                                {gem.lastThreeGames.slice(0, 3).map((game, gIdx) => (
+                                  <div key={gIdx} className="text-xs text-gray-600 bg-white/50 rounded px-2 py-1">
+                                    <span className="font-medium">Week {game.week} vs {game.opponent}:</span> {game.production} ({game.fantasyPoints.toFixed(1)} pts)
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* AI Analysis */}
+                          {gem.aiAnalysis && gem.aiAnalysis !== "AI analysis unavailable" && (
+                            <div className="p-3 bg-indigo-100 border border-indigo-300 rounded-lg">
+                              <p className="text-xs font-semibold text-indigo-900 mb-1">🤖 AI Analysis:</p>
+                              <p className="text-sm text-indigo-800">{gem.aiAnalysis}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowWaiverGems(false)}
+                      className="mt-3 text-sm text-indigo-700 hover:text-indigo-900 underline"
+                    >
+                      Hide Waiver Wire Gems
                     </button>
                   </div>
                 )}

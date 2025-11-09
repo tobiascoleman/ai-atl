@@ -11,12 +11,14 @@ import (
 type InsightHandler struct {
 	db                *mongo.Database
 	gameScriptService *services.GameScriptService
+	waiverWireService *services.WaiverWireService
 }
 
 func NewInsightHandler(db *mongo.Database) *InsightHandler {
 	return &InsightHandler{
 		db:                db,
 		gameScriptService: services.NewGameScriptService(db),
+		waiverWireService: services.NewWaiverWireService(db),
 	}
 }
 
@@ -71,11 +73,11 @@ func (h *InsightHandler) Streaks(c *gin.Context) {
 		"player_id": playerID,
 		"streaks": []map[string]interface{}{
 			{
-				"type":         "over",
-				"stat":         "receiving_yards",
-				"line":         75.5,
-				"games":        4,
-				"ai_analysis":  "Player has favorable matchups and increased target share",
+				"type":        "over",
+				"stat":        "receiving_yards",
+				"line":        75.5,
+				"games":       4,
+				"ai_analysis": "Player has favorable matchups and increased target share",
 			},
 		},
 	})
@@ -102,19 +104,43 @@ func (h *InsightHandler) TopPerformers(c *gin.Context) {
 	})
 }
 
-// WaiverGems finds undervalued players on waivers
+// WaiverGems finds undervalued players with breakout potential
 func (h *InsightHandler) WaiverGems(c *gin.Context) {
-	// TODO: Implement waiver wire gem finder
+	position := c.DefaultQuery("position", "ALL")
+	limit := 10 // Top 10 candidates
+
+	gems, err := h.waiverWireService.FindWaiverGems(c.Request.Context(), position, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"gems": []map[string]interface{}{
-			{
-				"player":       "Backup RB",
-				"team":         "KC",
-				"ownership":    15.2,
-				"epa_per_play": 0.25,
-				"analysis":     "Starting RB injured, expected to get 70% of touches",
-			},
-		},
+		"gems":  gems,
+		"count": len(gems),
 	})
 }
 
+// PersonalizedWaiverGems provides waiver recommendations based on user's ESPN roster
+func (h *InsightHandler) PersonalizedWaiverGems(c *gin.Context) {
+	var req struct {
+		Roster []services.RosterPlayer `json:"roster" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	limit := 10
+	gems, err := h.waiverWireService.FindPersonalizedWaiverGems(c.Request.Context(), req.Roster, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"gems":  gems,
+		"count": len(gems),
+	})
+}
