@@ -155,20 +155,27 @@ type RosterPlayer struct {
 }
 
 // FindPersonalizedWaiverGems analyzes waiver wire based on user's roster needs
-func (s *WaiverWireService) FindPersonalizedWaiverGems(ctx context.Context, roster []RosterPlayer, limit int) ([]WaiverGem, error) {
+func (s *WaiverWireService) FindPersonalizedWaiverGems(ctx context.Context, roster []RosterPlayer, position string, limit int) ([]WaiverGem, error) {
 	// Analyze roster strength by position
 	positionStrength := s.analyzeRosterStrength(roster)
 
 	// Find weak positions that need upgrades
 	weakPositions := s.identifyWeakPositions(positionStrength)
 
-	fmt.Printf("Roster analysis: Weak positions: %v\n", weakPositions)
+	fmt.Printf("Roster analysis: Weak positions: %v, Position filter: %s\n", weakPositions, position)
 
-	// Get waiver gems for ALL positions in one query (much faster than 4 separate calls)
-	allGems, err := s.FindWaiverGems(ctx, "ALL", 30)
+	// Get waiver gems (filter by position if specified)
+	searchPosition := position
+	if searchPosition == "" || searchPosition == "ALL" {
+		searchPosition = "ALL"
+	}
+	
+	allGems, err := s.FindWaiverGems(ctx, searchPosition, 30)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Found %d candidates for position: %s\n", len(allGems), searchPosition)
 
 	// Prioritize based on roster needs
 	for i := range allGems {

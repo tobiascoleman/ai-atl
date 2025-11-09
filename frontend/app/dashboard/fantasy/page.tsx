@@ -161,9 +161,20 @@ export default function FantasyPage() {
   const handleLoadFreeAgents = async (position?: string) => {
     setEspnLoading(true);
     setEspnError(null);
+    console.log("Loading free agents with position:", position);
     try {
       const result = await fetchFreeAgents(position, 50);
-      setFreeAgents(result.players);
+      console.log(`Received ${result.players.length} free agents from API`);
+      console.log("First 5 player positions:", result.players.slice(0, 5).map(p => `${p.name} (${p.position})`));
+      
+      // Apply client-side filter as backup (in case API doesn't filter properly)
+      let filteredPlayers = result.players;
+      if (position) {
+        filteredPlayers = result.players.filter(p => p.position === position);
+        console.log(`After client-side filter: ${filteredPlayers.length} players match position ${position}`);
+      }
+      
+      setFreeAgents(filteredPlayers);
       setShowFreeAgents(true);
     } catch (err: any) {
       console.error("Free agents error:", err);
@@ -234,7 +245,7 @@ export default function FantasyPage() {
           lineupSlot: player.lineupSlot,
         }));
         
-        const result = await insightsAPI.getPersonalizedWaiverGems(rosterData);
+        const result = await insightsAPI.getPersonalizedWaiverGems(rosterData, position);
         setWaiverGems(result.gems);
         setShowWaiverGems(true);
       } else {

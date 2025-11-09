@@ -124,7 +124,8 @@ func (h *InsightHandler) WaiverGems(c *gin.Context) {
 // PersonalizedWaiverGems provides waiver recommendations based on user's ESPN roster
 func (h *InsightHandler) PersonalizedWaiverGems(c *gin.Context) {
 	var req struct {
-		Roster []services.RosterPlayer `json:"roster" binding:"required"`
+		Roster   []services.RosterPlayer `json:"roster" binding:"required"`
+		Position string                  `json:"position"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -132,8 +133,13 @@ func (h *InsightHandler) PersonalizedWaiverGems(c *gin.Context) {
 		return
 	}
 
+	// Default to "ALL" if not specified
+	if req.Position == "" {
+		req.Position = "ALL"
+	}
+
 	limit := 10
-	gems, err := h.waiverWireService.FindPersonalizedWaiverGems(c.Request.Context(), req.Roster, limit)
+	gems, err := h.waiverWireService.FindPersonalizedWaiverGems(c.Request.Context(), req.Roster, req.Position, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
