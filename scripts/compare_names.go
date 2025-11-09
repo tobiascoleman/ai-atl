@@ -28,7 +28,7 @@ func main() {
 	}
 	defer client.Disconnect(ctx)
 
-	db := client.Database("ai-atl")
+	db := client.Database("nfl_platform")
 
 	// Get sample player names from players collection
 	fmt.Println("=== Sample names from PLAYERS collection ===")

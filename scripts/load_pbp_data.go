@@ -65,7 +65,7 @@ func main() {
 	}
 	defer client.Disconnect(ctx)
 
-	db := client.Database("ai-atl")
+	db := client.Database("nfl_platform")
 	collection := db.Collection("plays")
 
 	// Load 2025 season play-by-play data

@@ -26,7 +26,7 @@ func main() {
 	}
 	defer client.Disconnect(ctx)
 
-	db := client.Database("nfl_data")
+	db := client.Database("nfl_platform")
 	playsCollection := db.Collection("plays")
 
 	log.Println("Creating indexes for waiver wire performance optimization...")
