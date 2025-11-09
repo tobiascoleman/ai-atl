@@ -61,6 +61,10 @@ type PlayerStats struct {
 	EPA       float64 `json:"epa" bson:"epa"`               // Expected Points Added
 	PlayCount int     `json:"play_count" bson:"play_count"` // Number of plays involved in
 
+	// Fantasy Points
+	FantasyPoints    float64 `json:"fantasy_points" bson:"fantasy_points"`         // Standard fantasy points
+	FantasyPointsPPR float64 `json:"fantasy_points_ppr" bson:"fantasy_points_ppr"` // PPR fantasy points
+
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
@@ -76,20 +80,36 @@ type WeeklyRosterEntry struct {
 }
 
 type WeeklyStat struct {
-	Week            int     `json:"week" bson:"week"`
-	Season          int     `json:"season" bson:"season"`
-	Opponent        string  `json:"opponent" bson:"opponent"`
-	Yards           int     `json:"yards" bson:"yards"`
-	Touchdowns      int     `json:"touchdowns" bson:"touchdowns"`
-	Receptions      int     `json:"receptions" bson:"receptions"`
-	Targets         int     `json:"targets" bson:"targets"`
-	Carries         int     `json:"carries" bson:"carries"`
-	PassingYards    int     `json:"passing_yards" bson:"passing_yards"`
-	PassingTDs      int     `json:"passing_tds" bson:"passing_tds"`
-	Interceptions   int     `json:"interceptions" bson:"interceptions"`
-	EPA             float64 `json:"epa" bson:"epa"`
-	ProjectedPoints float64 `json:"projected_points" bson:"projected_points"`
-	ActualPoints    float64 `json:"actual_points" bson:"actual_points"`
+	ID       bson.ObjectID `json:"id" bson:"_id,omitempty"`
+	NFLID    string        `json:"nfl_id" bson:"nfl_id"`
+	Week     int           `json:"week" bson:"week"`
+	Season   int           `json:"season" bson:"season"`
+	Opponent string        `json:"opponent" bson:"opponent"`
+
+	// Passing Stats
+	PassingYards  int `json:"passing_yards" bson:"passing_yards"`
+	PassingTDs    int `json:"passing_tds" bson:"passing_tds"`
+	Interceptions int `json:"interceptions" bson:"interceptions"`
+
+	// Rushing Stats
+	Carries      int `json:"carries" bson:"carries"`
+	RushingYards int `json:"rushing_yards" bson:"rushing_yards"`
+	RushingTDs   int `json:"rushing_tds" bson:"rushing_tds"`
+
+	// Receiving Stats
+	Receptions     int `json:"receptions" bson:"receptions"`
+	Targets        int `json:"targets" bson:"targets"`
+	ReceivingYards int `json:"receiving_yards" bson:"receiving_yards"`
+	ReceivingTDs   int `json:"receiving_tds" bson:"receiving_tds"`
+
+	// Performance Metrics
+	EPA float64 `json:"epa" bson:"epa"`
+
+	// Fantasy Points
+	FantasyPoints    float64 `json:"fantasy_points" bson:"fantasy_points"`         // Standard fantasy points
+	FantasyPointsPPR float64 `json:"fantasy_points_ppr" bson:"fantasy_points_ppr"` // PPR fantasy points
+
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 // IsInjured returns true if the player has an injury status

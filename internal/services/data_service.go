@@ -129,6 +129,30 @@ func (s *DataService) GetPlayerStats(ctx context.Context, nflID string, season i
 	return stats, nil
 }
 
+// GetPlayerWeeklyStats gets weekly stats for a player
+func (s *DataService) GetPlayerWeeklyStats(ctx context.Context, nflID string, season int, week int) ([]models.WeeklyStat, error) {
+	filter := bson.M{"nfl_id": nflID}
+	if season > 0 {
+		filter["season"] = season
+	}
+	if week > 0 {
+		filter["week"] = week
+	}
+
+	cursor, err := s.db.Collection("player_weekly_stats").Find(ctx, filter,
+		options.Find().SetSort(bson.D{{"season", -1}, {"week", -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var weeklyStats []models.WeeklyStat
+	if err := cursor.All(ctx, &weeklyStats); err != nil {
+		return nil, err
+	}
+	return weeklyStats, nil
+}
+
 // ========================================
 // PLAY-BY-PLAY QUERIES
 // ========================================
@@ -382,6 +406,30 @@ func (s *DataService) GetUpcomingGames(ctx context.Context, team string) ([]mode
 	return games, nil
 }
 
+// GetScheduledGames gets scheduled (not yet played) games for a season/week
+func (s *DataService) GetScheduledGames(ctx context.Context, season int, week int) ([]models.Game, error) {
+	filter := bson.M{
+		"season": season,
+		"status": "scheduled",
+	}
+	if week > 0 {
+		filter["week"] = week
+	}
+
+	cursor, err := s.db.Collection("games").Find(ctx, filter,
+		options.Find().SetSort(bson.D{{"start_time", 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var games []models.Game
+	if err := cursor.All(ctx, &games); err != nil {
+		return nil, err
+	}
+	return games, nil
+}
+
 // ========================================
 // AGGREGATE QUERIES
 // ========================================
@@ -484,6 +532,14 @@ func (s *DataService) GetPlayerSummary(ctx context.Context, nflID string, season
 	// Get ALL NGS stats (all seasons)
 	allNGS, _ := s.GetPlayerNGS(ctx, nflID, "", 0) // 0 = all seasons
 	summary["all_ngs"] = allNGS
+
+	// Get weekly stats for current season
+	weeklyStats, _ := s.GetPlayerWeeklyStats(ctx, nflID, player.Season, 0) // 0 = all weeks
+	summary["weekly_stats"] = weeklyStats
+
+	// Get ALL weekly stats (all seasons)
+	allWeeklyStats, _ := s.GetPlayerWeeklyStats(ctx, nflID, 0, 0) // 0, 0 = all seasons, all weeks
+	summary["all_weekly_stats"] = allWeeklyStats
 
 	return summary, nil
 }

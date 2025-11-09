@@ -32,7 +32,7 @@ func main() {
 	if mongoURI == "" {
 		log.Fatal("   ✗ MONGO_URI not set!")
 	}
-	
+
 	// Mask the password for display
 	maskedURI := mongoURI
 	if len(mongoURI) > 50 {
@@ -44,7 +44,7 @@ func main() {
 	// Attempt connection
 	fmt.Println("3. Attempting MongoDB connection...")
 	fmt.Println("   Setting up client options...")
-	
+
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	clientOptions := options.Client().
 		ApplyURI(mongoURI).
@@ -90,7 +90,7 @@ func main() {
 
 	// Test specific database
 	fmt.Println("7. Testing AI-ATL database...")
-	db := client.Database("AI-ATL")
+	db := client.Database("nfl_platform")
 	collections, err := db.ListCollectionNames(ctx, map[string]interface{}{})
 	if err != nil {
 		log.Printf("   ⚠ Warning: Could not list collections: %v", err)
@@ -112,4 +112,3 @@ func main() {
 	fmt.Println("Your backend should now work. Try running:")
 	fmt.Println("  go run cmd/api/main.go")
 }
-

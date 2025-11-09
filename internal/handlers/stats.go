@@ -61,7 +61,7 @@ func (h *StatsHandler) GetDashboardStats(c *gin.Context) {
 
 	// Count plays collection (estimated for speed)
 	go func() {
-		count, err := h.db.Collection("play_by_play").EstimatedDocumentCount(ctx)
+		count, err := h.db.Collection("plays").EstimatedDocumentCount(ctx)
 		resultsChan <- countResult{"plays", count, err}
 	}()
 

@@ -367,6 +367,28 @@ func (h *DataHandler) GetUpcomingGames(c *gin.Context) {
 	})
 }
 
+// GetScheduledGames - GET /api/data/games/scheduled?season=2025&week=10
+func (h *DataHandler) GetScheduledGames(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	season, _ := strconv.Atoi(c.DefaultQuery("season", "2025"))
+	week, _ := strconv.Atoi(c.Query("week"))
+
+	games, err := h.service.GetScheduledGames(ctx, season, week)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch scheduled games"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"season": season,
+		"week":   week,
+		"count":  len(games),
+		"games":  games,
+	})
+}
+
 // ========================================
 // AGGREGATE ENDPOINTS
 // ========================================

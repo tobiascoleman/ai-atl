@@ -74,6 +74,25 @@ func CreateIndexes(ctx context.Context, db *mongo.Database) error {
 		return err
 	}
 
+	// Player weekly stats collection indexes
+	weeklyStatsIndexes := []mongo.IndexModel{
+		{
+			// Compound unique index: one stat entry per player per season per week
+			Keys:    bson.D{{"nfl_id", 1}, {"season", 1}, {"week", 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{"nfl_id", 1}, {"season", 1}},
+		},
+		{
+			Keys: bson.D{{"season", 1}, {"week", 1}},
+		},
+	}
+	_, err = db.Collection("player_weekly_stats").Indexes().CreateMany(ctx, weeklyStatsIndexes)
+	if err != nil {
+		return err
+	}
+
 	// Games collection indexes
 	gameIndexes := []mongo.IndexModel{
 		{

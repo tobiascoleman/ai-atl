@@ -30,9 +30,9 @@ func NewESPNHandler(db *mongo.Database, flaskServiceURL string) *ESPNHandler {
 type ESPNCredentials struct {
 	ESPNS2   string `json:"espn_s2" binding:"required"`
 	ESPNSWID string `json:"espn_swid" binding:"required"`
-	LeagueID int    `json:"league_id" binding:"required"`
-	TeamID   int    `json:"team_id" binding:"required"`
-	Year     int    `json:"year" binding:"required"`
+	LeagueID int    `json:"league_id" binding:"required,gt=0"`
+	TeamID   int    `json:"team_id" binding:"required,gt=0"`
+	Year     int    `json:"year" binding:"required,gt=0"`
 }
 
 type ESPNPlayer struct {
@@ -68,15 +68,22 @@ type ESPNRosterResponse struct {
 func (h *ESPNHandler) SaveCredentials(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
+		fmt.Println("ESPN SaveCredentials: No user_id in context")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
 	var creds ESPNCredentials
 	if err := c.ShouldBindJSON(&creds); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		fmt.Printf("ESPN SaveCredentials: Invalid JSON binding: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Please fill in all fields. League ID, Team ID, and Year must be valid numbers greater than 0.",
+		})
 		return
 	}
+
+	fmt.Printf("ESPN SaveCredentials: Received creds for user %s - LeagueID: %d, TeamID: %d, Year: %d\n",
+		userID, creds.LeagueID, creds.TeamID, creds.Year)
 
 	// Update user document with ESPN credentials
 	objectID, err := bson.ObjectIDFromHex(userID)
@@ -97,10 +104,12 @@ func (h *ESPNHandler) SaveCredentials(c *gin.Context) {
 
 	_, err = h.db.Collection("users").UpdateByID(c.Request.Context(), objectID, update)
 	if err != nil {
+		fmt.Printf("ESPN SaveCredentials: Database error: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save credentials"})
 		return
 	}
 
+	fmt.Printf("ESPN SaveCredentials: Successfully saved credentials for user %s\n", userID)
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "ESPN credentials saved successfully",
 		"connected": true,

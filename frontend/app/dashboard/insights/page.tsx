@@ -1,21 +1,51 @@
 'use client'
 
-import { useState } from 'react'
-import { Brain, TrendingUp, Activity, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Brain, TrendingUp, Activity, AlertCircle, Calendar } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { insightsAPI } from '@/lib/api/insights'
-import { GameScriptPrediction } from '@/types/api'
+import { gamesAPI } from '@/lib/api/games'
+import { GameScriptPrediction, Game } from '@/types/api'
 
 export default function InsightsPage() {
-  const [gameId, setGameId] = useState('2024_09_KC_BUF')
+  const [season] = useState(2025)
+  const [week, setWeek] = useState(10)
+  const [games, setGames] = useState<Game[]>([])
+  const [selectedGame, setSelectedGame] = useState<string>('')
   const [prediction, setPrediction] = useState<GameScriptPrediction | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingGames, setLoadingGames] = useState(false)
   const [error, setError] = useState('')
 
+  // Fetch scheduled games when week changes
+  useEffect(() => {
+    const fetchGames = async () => {
+      setLoadingGames(true)
+      setSelectedGame('') // Reset selection when week changes
+      try {
+        const scheduledGames = await gamesAPI.getScheduledGames(season, week)
+        setGames(scheduledGames)
+        // Auto-select first game if available
+        if (scheduledGames.length > 0) {
+          setSelectedGame(scheduledGames[0].game_id)
+        }
+      } catch (err) {
+        console.error('Failed to fetch games:', err)
+      } finally {
+        setLoadingGames(false)
+      }
+    }
+    fetchGames()
+  }, [week, season])
+
   const handlePredict = async () => {
+    if (!selectedGame) return
+    
     setLoading(true)
     setError('')
     try {
-      const data = await insightsAPI.getGameScript(gameId)
+      const data = await insightsAPI.getGameScript(selectedGame)
       setPrediction(data)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to fetch prediction')
@@ -35,26 +65,65 @@ export default function InsightsPage() {
 
       {/* Input Section */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Select Game
-        </label>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={gameId}
-            onChange={(e) => setGameId(e.target.value)}
-            placeholder="Enter game ID (e.g., 2024_09_KC_BUF)"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
-          />
-          <button
-            onClick={handlePredict}
-            disabled={loading || !gameId}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center gap-2"
-          >
-            <Brain size={18} />
-            {loading ? 'Analyzing...' : 'Predict'}
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {/* Week Selector */}
+          <div>
+            <label htmlFor="week-selector" className="block text-sm font-medium text-gray-700 mb-2">
+              <Calendar className="inline mr-2" size={16} />
+              Week
+            </label>
+            <select
+              id="week-selector"
+              value={week}
+              onChange={(e) => setWeek(Number(e.target.value))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+            >
+              {[...Array(18)].map((_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Week {i + 1}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Game Selector */}
+          <div>
+            <label htmlFor="game-selector" className="block text-sm font-medium text-gray-700 mb-2">
+              Select Game
+            </label>
+            {loadingGames ? (
+              <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                Loading games...
+              </div>
+            ) : games.length > 0 ? (
+              <select
+                id="game-selector"
+                value={selectedGame}
+                onChange={(e) => setSelectedGame(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+              >
+                {games.map((game) => (
+                  <option key={game.game_id} value={game.game_id}>
+                    {game.away_team} @ {game.home_team}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                No scheduled games for this week
+              </div>
+            )}
+          </div>
         </div>
+
+        <button
+          onClick={handlePredict}
+          disabled={loading || !selectedGame || loadingGames}
+          className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+        >
+          <Brain size={20} />
+          {loading ? 'Analyzing...' : 'Predict Game Script'}
+        </button>
       </div>
 
       {error && (
@@ -73,7 +142,25 @@ export default function InsightsPage() {
               <Activity className="text-blue-600" size={24} />
               <h2 className="text-xl font-bold">Predicted Game Flow</h2>
             </div>
-            <p className="text-gray-700 whitespace-pre-wrap">{prediction.predicted_flow}</p>
+            <div className="prose max-w-none text-gray-700">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mt-6 mb-4 text-gray-900" {...props} />,
+                  h2: ({ node, ...props }) => <h2 className="text-xl font-bold mt-5 mb-3 text-gray-900" {...props} />,
+                  h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mt-4 mb-2 text-gray-900" {...props} />,
+                  ul: ({ node, ...props }) => <ul className="list-disc list-inside space-y-2 my-3" {...props} />,
+                  ol: ({ node, ...props }) => <ol className="list-decimal list-inside space-y-2 my-3" {...props} />,
+                  li: ({ node, ...props }) => <li className="ml-4" {...props} />,
+                  p: ({ node, ...props }) => <p className="my-3 text-gray-700" {...props} />,
+                  strong: ({ node, ...props }) => <strong className="font-bold text-gray-900" {...props} />,
+                  em: ({ node, ...props }) => <em className="italic" {...props} />,
+                  code: ({ node, ...props }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props} />,
+                }}
+              >
+                {prediction.predicted_flow}
+              </ReactMarkdown>
+            </div>
           </div>
 
           {/* Confidence Score */}

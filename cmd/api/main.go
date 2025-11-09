@@ -150,10 +150,11 @@ func main() {
 				// Injury queries
 				data.GET("/injuries", dataHandler.GetInjuredPlayers)
 
-				// Game queries
-				data.GET("/games", dataHandler.GetGamesBySeason)
-				data.GET("/games/:game_id", dataHandler.GetGame)
-				data.GET("/games/:game_id/plays", dataHandler.GetGamePlays)
+			// Game queries
+			data.GET("/games", dataHandler.GetGamesBySeason)
+			data.GET("/games/scheduled", dataHandler.GetScheduledGames)
+			data.GET("/games/:game_id", dataHandler.GetGame)
+			data.GET("/games/:game_id/plays", dataHandler.GetGamePlays)
 
 				// NGS leaders
 				data.GET("/ngs/leaders", dataHandler.GetNGSLeaders)
@@ -168,9 +169,8 @@ func main() {
 				insights.GET("/streaks", insightHandler.Streaks)
 				insights.GET("/top_performers", insightHandler.TopPerformers)
 				insights.GET("/waiver_gems", insightHandler.WaiverGems)
-			}
-
-			// Trade Analyzer
+				insights.POST("/personalized_waiver_gems", insightHandler.PersonalizedWaiverGems)
+			} // Trade Analyzer
 			trades := protected.Group("/trades")
 			{
 				tradeHandler := handlers.NewTradeHandler(db)

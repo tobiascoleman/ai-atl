@@ -140,11 +140,30 @@ export interface Streak {
   confidence: number;
 }
 
+export interface GameStats {
+  week: number;
+  opponent: string;
+  snapPct: number;
+  targets: number;
+  targetShare: number;
+  production: string;
+  fantasyPoints: number;
+}
+
 export interface WaiverGem {
-  player: Player;
-  ownership: number;
-  epa_per_play: number;
-  ai_analysis: string;
+  playerName: string;
+  position: string;
+  team: string;
+  breakoutScore: number;
+  targetShareTrend: string;
+  snapCountPct: number;
+  epaPerPlay: number;
+  depthChartStatus: string;
+  upcomingSchedule: string;
+  scheduleRank: number;
+  lastThreeGames: GameStats[];
+  trendingUp: boolean;
+  aiAnalysis: string;
   recommendation: string;
 }
 

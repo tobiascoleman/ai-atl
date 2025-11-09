@@ -77,6 +77,14 @@ reload-player-stats:
 	@echo ""
 	go run scripts/reload_player_stats.go
 
+# Quick reload of just games/schedules with proper status handling
+reload-games:
+	@echo "🔄 Reloading games with proper status (scheduled/final)"
+	@echo "⏱️  Expected time: < 1 minute"
+	@echo "✨ Includes: 2025 schedule, proper game dates, status tracking"
+	@echo ""
+	go run scripts/reload_games.go
+
 # Full setup for new developers
 setup: deps docker-up
 	@echo "Waiting for MongoDB to be ready..."
