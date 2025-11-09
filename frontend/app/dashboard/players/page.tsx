@@ -126,7 +126,6 @@ export default function PlayersPage() {
         {loading ? (
           <div className="p-12 text-center text-gray-500">Loading players...</div>
         ) : players.length === 0 ? (
-        ) : players.length === 0 ? (
           <div className="p-12 text-center text-gray-500">No players found</div>
         ) : (
           <div className="overflow-x-auto">

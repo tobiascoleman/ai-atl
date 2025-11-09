@@ -470,7 +470,7 @@ function WeekView({ detailData, player, selectedSeason }: { detailData: PlayerDe
     <>
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="p-6 border-b">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-gray-900">
             <Activity size={24} />
             <h3 className="text-xl font-bold">{selectedSeason} Week-by-Week Stats</h3>
           </div>
@@ -520,29 +520,29 @@ function WeekView({ detailData, player, selectedSeason }: { detailData: PlayerDe
                       <td className="px-4 py-3 text-sm text-gray-700">{week.opponent || '-'}</td>
                       {isQB && (
                         <>
-                          <td className="px-4 py-3 text-sm text-right">{week.passing_yards || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.passing_tds || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.interceptions || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.rushing_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.passing_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.passing_tds || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.interceptions || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.rushing_yards || 0}</td>
                         </>
                       )}
                       {isRB && (
                         <>
-                          <td className="px-4 py-3 text-sm text-right">{week.rushing_yards || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.rushing_tds || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.receptions || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.receiving_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.rushing_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.rushing_tds || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.receptions || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.receiving_yards || 0}</td>
                         </>
                       )}
                       {isWRTE && (
                         <>
-                          <td className="px-4 py-3 text-sm text-right">{week.receptions || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.targets || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.receiving_yards || 0}</td>
-                          <td className="px-4 py-3 text-sm text-right">{week.receiving_tds || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.receptions || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.targets || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.receiving_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">{week.receiving_tds || 0}</td>
                         </>
                       )}
-                      <td className="px-4 py-3 text-sm text-right font-semibold">
+                      <td className="px-4 py-3 text-sm text-right text-gray-900 font-semibold">
                         {week.fantasy_points_ppr ? week.fantasy_points_ppr.toFixed(1) : '0.0'}
                       </td>
                       <td className="px-4 py-3 text-sm text-right">
