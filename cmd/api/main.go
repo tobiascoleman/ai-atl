@@ -150,10 +150,11 @@ func main() {
 				// Injury queries
 				data.GET("/injuries", dataHandler.GetInjuredPlayers)
 
-				// Game queries
-				data.GET("/games", dataHandler.GetGamesBySeason)
-				data.GET("/games/:game_id", dataHandler.GetGame)
-				data.GET("/games/:game_id/plays", dataHandler.GetGamePlays)
+			// Game queries
+			data.GET("/games", dataHandler.GetGamesBySeason)
+			data.GET("/games/scheduled", dataHandler.GetScheduledGames)
+			data.GET("/games/:game_id", dataHandler.GetGame)
+			data.GET("/games/:game_id/plays", dataHandler.GetGamePlays)
 
 				// NGS leaders
 				data.GET("/ngs/leaders", dataHandler.GetNGSLeaders)

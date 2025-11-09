@@ -51,6 +51,7 @@ var dataURLs = map[string]string{
 
 	// Player stats (2017+)
 	"player_stats_regpost": nflverseBaseURL + "/stats_player/stats_player_regpost_%d.parquet",
+	"player_stats_weekly":  nflverseBaseURL + "/stats_player/stats_player_week_%d.parquet",
 
 	// Team stats (1999+) - multiple types
 	"team_stats_post":    nflverseBaseURL + "/stats_team/stats_team_post_%d.parquet",
@@ -151,12 +152,16 @@ func (l *DataLoader) LoadAll(ctx context.Context) {
 
 	fmt.Println("\n📊 Phase 4: Loading Player Stats (2020-2025)")
 	fmt.Println(strings.Repeat("=", 50))
-	l.LoadPlayerStats(ctx, 2020, 2025)
+	//l.LoadPlayerStats(ctx, 2020, 2025)
+
+	fmt.Println("\n📊 Phase 4.5: Loading Weekly Player Stats (2020-2025)")
+	fmt.Println(strings.Repeat("=", 50))
+	//l.LoadWeeklyStats(ctx, 2020, 2025)
 
 	fmt.Println("\n📊 Phase 5: Loading Play-by-Play Data (ALL 27 SEASONS!) 🏈")
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Println("This is the biggest dataset - will take 15-20 minutes")
-	//l.LoadPlayByPlay(ctx, 1999, 2025)
+	l.LoadPlayByPlay(ctx, 1999, 2025)
 
 	fmt.Println("\n📊 Phase 6: Loading Next Gen Stats (All Seasons)")
 	fmt.Println(strings.Repeat("=", 50))
@@ -331,6 +336,53 @@ func (l *DataLoader) loadPlayerStatsYear(ctx context.Context, year int) {
 	l.mu.Unlock()
 
 	fmt.Printf("✓ Loaded %d player stats from %d\n", inserted, year)
+}
+
+func (l *DataLoader) LoadWeeklyStats(ctx context.Context, startYear, endYear int) {
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 5)
+
+	for year := startYear; year <= endYear; year++ {
+		wg.Add(1)
+		go func(y int) {
+			defer wg.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			l.loadWeeklyStatsYear(ctx, y)
+		}(year)
+	}
+
+	wg.Wait()
+}
+
+func (l *DataLoader) loadWeeklyStatsYear(ctx context.Context, year int) {
+	// Weekly stats only available from 2017+
+	if year < 2017 {
+		return
+	}
+
+	fmt.Printf("→ Loading weekly stats %d...\n", year)
+
+	url := fmt.Sprintf(dataURLs["player_stats_weekly"], year)
+	data, err := l.downloadFile(url, fmt.Sprintf("player_stats_weekly_%d.parquet", year))
+	if err != nil {
+		log.Printf("❌ Failed to download weekly stats %d: %v", year, err)
+		l.mu.Lock()
+		l.stats.Errors++
+		l.mu.Unlock()
+		return
+	}
+
+	// Parse the weekly stats
+	weeklyStats := l.parseWeeklyStats(data, year)
+	inserted := l.insertWeeklyStats(ctx, weeklyStats)
+
+	l.mu.Lock()
+	l.stats.PlayersLoaded += inserted // Reuse counter
+	l.mu.Unlock()
+
+	fmt.Printf("✓ Loaded %d weekly stat records from %d\n", inserted, year)
 }
 
 func (l *DataLoader) LoadPlayByPlay(ctx context.Context, startYear, endYear int) {
@@ -534,6 +586,15 @@ func (l *DataLoader) parsePlayerStats(data []byte, year int, seasonType string) 
 		return []models.PlayerStats{}
 	}
 	return stats
+}
+
+func (l *DataLoader) parseWeeklyStats(data []byte, year int) []models.WeeklyStat {
+	weeklyStats, err := parquet.ParseWeeklyStats(data, year)
+	if err != nil {
+		log.Printf("Error parsing weekly stats %d: %v", year, err)
+		return []models.WeeklyStat{}
+	}
+	return weeklyStats
 }
 
 func (l *DataLoader) parsePlayByPlay(data []byte, year int) []models.Play {
@@ -789,6 +850,35 @@ func (l *DataLoader) insertPlayerStats(ctx context.Context, stats []models.Playe
 		_, err := collection.UpdateOne(ctx, filter, update, opts)
 		if err != nil {
 			log.Printf("Error upserting player stats: %v", err)
+			continue
+		}
+		inserted++
+	}
+
+	return inserted
+}
+
+func (l *DataLoader) insertWeeklyStats(ctx context.Context, weeklyStats []models.WeeklyStat) int {
+	if len(weeklyStats) == 0 {
+		return 0
+	}
+
+	collection := l.db.Collection("player_weekly_stats")
+
+	// Upsert weekly stats with compound key (nfl_id + season + week)
+	inserted := 0
+	for _, stat := range weeklyStats {
+		filter := bson.M{
+			"nfl_id": stat.NFLID,
+			"season": stat.Season,
+			"week":   stat.Week,
+		}
+		update := bson.M{"$set": stat}
+
+		opts := options.UpdateOne().SetUpsert(true)
+		_, err := collection.UpdateOne(ctx, filter, update, opts)
+		if err != nil {
+			log.Printf("Error upserting weekly stats: %v", err)
 			continue
 		}
 		inserted++

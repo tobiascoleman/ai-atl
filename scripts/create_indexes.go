@@ -37,7 +37,7 @@ func main() {
 
 	// PLAYERS COLLECTION INDEXES
 	playersCollection := db.Collection("players")
-	
+
 	// Index for name lookups and sorting
 	_, err = playersCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{{Key: "name", Value: 1}},
@@ -149,7 +149,7 @@ func main() {
 	}
 
 	// PLAY_BY_PLAY COLLECTION INDEXES
-	playsCollection := db.Collection("play_by_play")
+	playsCollection := db.Collection("plays")
 
 	// Index for game_id lookups
 	_, err = playsCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
@@ -158,7 +158,7 @@ func main() {
 	if err != nil {
 		log.Printf("❌ Failed to create game_id index: %v", err)
 	} else {
-		log.Println("✅ Created index on play_by_play.game_id")
+		log.Println("✅ Created index on plays.game_id")
 	}
 
 	// Index for season lookups
@@ -168,7 +168,7 @@ func main() {
 	if err != nil {
 		log.Printf("❌ Failed to create season index on plays: %v", err)
 	} else {
-		log.Println("✅ Created index on play_by_play.season")
+		log.Println("✅ Created index on plays.season")
 	}
 
 	// GAMES/SCHEDULES COLLECTION INDEXES

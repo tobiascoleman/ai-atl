@@ -387,6 +387,10 @@ func ParsePlayerStats(data []byte, season int, seasonType string) ([]models.Play
 			EPA:       combinedEPA,
 			PlayCount: playCount,
 
+			// Fantasy Points
+			FantasyPoints:    getFloat("fantasy_points", i),
+			FantasyPointsPPR: getFloat("fantasy_points_ppr", i),
+
 			UpdatedAt: time.Now(),
 		}
 
@@ -396,6 +400,155 @@ func ParsePlayerStats(data []byte, season int, seasonType string) ([]models.Play
 	}
 
 	return stats, nil
+}
+
+// ParseWeeklyStats reads a Parquet weekly player stats file and returns WeeklyStat models
+func ParseWeeklyStats(data []byte, season int) ([]models.WeeklyStat, error) {
+	reader, err := file.NewParquetReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parquet reader: %w", err)
+	}
+	defer reader.Close()
+
+	arrowReader, err := pqarrow.NewFileReader(reader, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arrow reader: %w", err)
+	}
+
+	table, err := arrowReader.ReadTable(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read table: %w", err)
+	}
+	defer table.Release()
+
+	numRows := int(table.NumRows())
+	weeklyStats := make([]models.WeeklyStat, 0, numRows)
+
+	schema := table.Schema()
+	colMap := make(map[string]int)
+
+	// Debug: Print all available columns (first time only)
+	fmt.Printf("📋 Available columns in weekly_stats (season %d): ", season)
+	columnNames := make([]string, 0, len(schema.Fields()))
+	for i, field := range schema.Fields() {
+		colMap[field.Name] = i
+		columnNames = append(columnNames, field.Name)
+	}
+	fmt.Printf("%v\n", columnNames)
+
+	getChunkAndOffset := func(col *arrow.Column, rowIdx int) (arrow.Array, int) {
+		offset := rowIdx
+		for _, chunk := range col.Data().Chunks() {
+			if offset < chunk.Len() {
+				return chunk, offset
+			}
+			offset -= chunk.Len()
+		}
+		return nil, 0
+	}
+
+	getString := func(colName string, rowIdx int) string {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				if arr, ok := chunk.(*array.String); ok && !arr.IsNull(offset) {
+					return arr.Value(offset)
+				}
+			}
+		}
+		return ""
+	}
+
+	getInt := func(colName string, rowIdx int) int {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				switch arr := chunk.(type) {
+				case *array.Int64:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				case *array.Int32:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				case *array.Float64:
+					if !arr.IsNull(offset) {
+						return int(arr.Value(offset))
+					}
+				}
+			}
+		}
+		return 0
+	}
+
+	getFloat := func(colName string, rowIdx int) float64 {
+		if colIdx, ok := colMap[colName]; ok {
+			col := table.Column(colIdx)
+			chunk, offset := getChunkAndOffset(col, rowIdx)
+			if chunk != nil {
+				switch arr := chunk.(type) {
+				case *array.Float64:
+					if !arr.IsNull(offset) {
+						return arr.Value(offset)
+					}
+				case *array.Float32:
+					if !arr.IsNull(offset) {
+						return float64(arr.Value(offset))
+					}
+				}
+			}
+		}
+		return 0.0
+	}
+
+	for i := 0; i < numRows; i++ {
+		// Calculate combined EPA from passing, rushing, and receiving EPA
+		passingEPA := getFloat("passing_epa", i)
+		rushingEPA := getFloat("rushing_epa", i)
+		receivingEPA := getFloat("receiving_epa", i)
+		combinedEPA := passingEPA + rushingEPA + receivingEPA
+
+		weeklyStat := models.WeeklyStat{
+			NFLID:    getString("player_id", i),
+			Week:     getInt("week", i),
+			Season:   season,
+			Opponent: getString("opponent_team", i),
+
+			// Passing Stats
+			PassingYards:  getInt("passing_yards", i),
+			PassingTDs:    getInt("passing_tds", i),
+			Interceptions: getInt("passing_interceptions", i),
+
+			// Rushing Stats
+			Carries:      getInt("carries", i),
+			RushingYards: getInt("rushing_yards", i),
+			RushingTDs:   getInt("rushing_tds", i),
+
+			// Receiving Stats
+			Receptions:     getInt("receptions", i),
+			Targets:        getInt("targets", i),
+			ReceivingYards: getInt("receiving_yards", i),
+			ReceivingTDs:   getInt("receiving_tds", i),
+
+			// Performance Metrics
+			EPA: combinedEPA,
+
+			// Fantasy Points
+			FantasyPoints:    getFloat("fantasy_points", i),
+			FantasyPointsPPR: getFloat("fantasy_points_ppr", i),
+
+			UpdatedAt: time.Now(),
+		}
+
+		if weeklyStat.NFLID != "" && weeklyStat.Week > 0 {
+			weeklyStats = append(weeklyStats, weeklyStat)
+		}
+	}
+
+	return weeklyStats, nil
 }
 
 // ParseSchedules reads a Parquet schedule file and returns Game models
@@ -483,18 +636,71 @@ func ParseSchedules(data []byte) ([]models.Game, error) {
 		return 0.0
 	}
 
+	parseGameDateTime := func(gamedayStr, gametimeStr string) time.Time {
+		if gamedayStr == "" {
+			return time.Time{}
+		}
+
+		// Eastern Time zone (NFL games are typically in ET)
+		etLoc, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			etLoc = time.UTC
+		}
+
+		// Combine gameday and gametime
+		dateTimeStr := gamedayStr
+		if gametimeStr != "" {
+			dateTimeStr = gamedayStr + " " + gametimeStr
+		} else {
+			dateTimeStr = gamedayStr + " 13:00" // Default to 1pm ET if no time
+		}
+
+		// Parse as Eastern Time
+		t, err := time.ParseInLocation("2006-01-02 15:04", dateTimeStr, etLoc)
+		if err != nil {
+			// Fallback: try just the date
+			t, err = time.Parse("2006-01-02", gamedayStr)
+			if err != nil {
+				return time.Time{}
+			}
+		}
+
+		return t
+	}
+
 	for i := 0; i < numRows; i++ {
+		homeScore := getInt("home_score", i)
+		awayScore := getInt("away_score", i)
+		gamedayStr := getString("gameday", i)
+		gametimeStr := getString("gametime", i)
+		startTime := parseGameDateTime(gamedayStr, gametimeStr)
+
+		// Determine status based on whether game has been played
+		// If both scores are 0 and game time is in the future, it's scheduled
+		status := "final"
+		if homeScore == 0 && awayScore == 0 && !startTime.IsZero() {
+			// Compare the actual game time to now
+			// Add a buffer: games with no scores scheduled more than 4 hours ago are likely final
+			now := time.Now()
+			fourHoursAgo := now.Add(-4 * time.Hour)
+
+			if startTime.After(fourHoursAgo) {
+				status = "scheduled"
+			}
+		}
+
 		game := models.Game{
 			GameID:    getString("game_id", i),
 			Season:    getInt("season", i),
 			Week:      getInt("week", i),
 			HomeTeam:  getString("home_team", i),
 			AwayTeam:  getString("away_team", i),
+			StartTime: startTime,
 			VegasLine: getFloat("spread_line", i),
 			OverUnder: getFloat("total_line", i),
-			HomeScore: getInt("home_score", i),
-			AwayScore: getInt("away_score", i),
-			Status:    "final",
+			HomeScore: homeScore,
+			AwayScore: awayScore,
+			Status:    status,
 			UpdatedAt: time.Now(),
 		}
 

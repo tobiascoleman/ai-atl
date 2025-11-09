@@ -17,6 +17,8 @@ interface PlayerDetailData {
   stats: any[]
   all_stats: any[]
   all_ngs: any[]
+  weekly_stats: any[]
+  all_weekly_stats: any[]
   epa: number
   ngs: any[]
   play_count: number
@@ -457,8 +459,12 @@ function SeasonView({ detailData, player, selectedSeason }: { detailData: Player
 
 // Week View - Shows week-by-week breakdown
 function WeekView({ detailData, player, selectedSeason }: { detailData: PlayerDetailData; player: Player; selectedSeason: number }) {
-  // Get NGS stats for selected season (which are by week)
-  const weeklyNGS = detailData.all_ngs?.filter(n => n.season === selectedSeason && n.week > 0) || []
+  // Get weekly stats for selected season
+  const weeklyStats = detailData.all_weekly_stats?.filter(w => w.season === selectedSeason) || []
+  
+  const isQB = player.position === 'QB'
+  const isRB = player.position === 'RB'
+  const isWRTE = ['WR', 'TE'].includes(player.position)
   
   return (
     <>
@@ -468,38 +474,81 @@ function WeekView({ detailData, player, selectedSeason }: { detailData: PlayerDe
             <Activity size={24} />
             <h3 className="text-xl font-bold">{selectedSeason} Week-by-Week Stats</h3>
           </div>
-          {weeklyNGS.length === 0 && (
-            <p className="text-gray-500 mt-2">Week-by-week data coming soon. Currently showing Next Gen Stats by week.</p>
-          )}
         </div>
         
-        {weeklyNGS.length > 0 ? (
+        {weeklyStats.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stats</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">vs</th>
+                  {isQB && (
+                    <>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pass Yds</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pass TDs</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">INTs</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rush Yds</th>
+                    </>
+                  )}
+                  {isRB && (
+                    <>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rush Yds</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rush TDs</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rec</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rec Yds</th>
+                    </>
+                  )}
+                  {isWRTE && (
+                    <>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rec</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tgts</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rec Yds</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rec TDs</th>
+                    </>
+                  )}
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">PPR</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">EPA</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {weeklyNGS
+                {weeklyStats
                   .sort((a, b) => a.week - b.week)
                   .map((week) => (
                     <tr key={week.week} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">Week {week.week}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{week.team}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {week.stat_type === 'passing' && (
-                          `${week.pass_completions}/${week.pass_attempts}, ${week.pass_yards} yds, ${week.pass_touchdowns} TDs`
-                        )}
-                        {week.stat_type === 'rushing' && (
-                          `${week.carries} car, ${week.rush_yards} yds, ${week.rush_touchdowns} TDs`
-                        )}
-                        {week.stat_type === 'receiving' && (
-                          `${week.receptions}/${week.targets} tgt, ${week.receiving_yards} yds, ${week.receiving_touchdowns} TDs`
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">{week.opponent || '-'}</td>
+                      {isQB && (
+                        <>
+                          <td className="px-4 py-3 text-sm text-right">{week.passing_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.passing_tds || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.interceptions || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.rushing_yards || 0}</td>
+                        </>
+                      )}
+                      {isRB && (
+                        <>
+                          <td className="px-4 py-3 text-sm text-right">{week.rushing_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.rushing_tds || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.receptions || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.receiving_yards || 0}</td>
+                        </>
+                      )}
+                      {isWRTE && (
+                        <>
+                          <td className="px-4 py-3 text-sm text-right">{week.receptions || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.targets || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.receiving_yards || 0}</td>
+                          <td className="px-4 py-3 text-sm text-right">{week.receiving_tds || 0}</td>
+                        </>
+                      )}
+                      <td className="px-4 py-3 text-sm text-right font-semibold">
+                        {week.fantasy_points_ppr ? week.fantasy_points_ppr.toFixed(1) : '0.0'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right">
+                        <span className={week.epa >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          {week.epa ? week.epa.toFixed(2) : '0.00'}
+                        </span>
                       </td>
                     </tr>
                   ))}
