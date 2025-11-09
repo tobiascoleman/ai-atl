@@ -144,9 +144,17 @@ func (s *ChatbotService) retrieveRelevantStats(ctx context.Context, intent *Quer
 		player := players[0] // Use first match
 		statsBuilder.WriteString(fmt.Sprintf("## %s (%s - %s)\n", player.Name, player.Position, player.Team))
 
-		// Get injury status
-		if player.Status == "INA" || player.StatusDescriptionAbbr != "" {
-			statsBuilder.WriteString(fmt.Sprintf("- **Injury Status**: %s (Week %d)\n", player.StatusDescriptionAbbr, player.Week))
+		// Get injury status using proper status mapper
+		if player.StatusDescriptionAbbr != "" {
+			statusDesc := models.GetPlayerStatusDescription(player.Status, player.StatusDescriptionAbbr)
+			
+			// Only show status if it's actually an injury/inactive status (not just "Active")
+			if player.Status == "INA" || isInjuryStatus(player.StatusDescriptionAbbr) {
+				statsBuilder.WriteString(fmt.Sprintf("- **Injury Status**: %s (Week %d)\n", statusDesc, player.Week))
+			} else if player.StatusDescriptionAbbr == "A01" {
+				// Player is healthy/active - show positive status
+				statsBuilder.WriteString(fmt.Sprintf("- **Status**: %s ✅\n", statusDesc))
+			}
 		}
 
 		// Get season stats
@@ -196,8 +204,10 @@ func (s *ChatbotService) retrieveRelevantStats(ctx context.Context, intent *Quer
 			if err == nil {
 				var injured []string
 				for _, p := range players {
-					if p.Status == "INA" || p.StatusDescriptionAbbr != "" {
-						injured = append(injured, fmt.Sprintf("%s (%s)", p.Name, p.Position))
+					// Only include actually injured players, not active ones
+					if p.Status == "INA" || isInjuryStatus(p.StatusDescriptionAbbr) {
+						statusDesc := models.GetPlayerStatusDescription(p.Status, p.StatusDescriptionAbbr)
+						injured = append(injured, fmt.Sprintf("%s (%s) - %s", p.Name, p.Position, statusDesc))
 					}
 				}
 				if len(injured) > 0 {
@@ -302,5 +312,39 @@ Be conversational but data-driven. Explain your reasoning.`,
 		dataContext,
 		question,
 	)
+}
+
+// isInjuryStatus returns true if the status code represents an actual injury or inactive status
+// This filters out active/healthy statuses like A01 (Active)
+func isInjuryStatus(statusAbbr string) bool {
+	// Injury-related status codes that should be flagged
+	injuryStatuses := map[string]bool{
+		// Reserve statuses (all indicate unavailable)
+		"R01": true, // Reserve/Injured
+		"R02": true, // Reserve/Retired
+		"R03": true, // Reserve/Left Squad
+		"R04": true, // Reserve/PUP
+		"R05": true, // Reserve/Military
+		"R06": true, // Reserve/Non-Football Injury
+		"R07": true, // Reserve/Suspended
+		"R08": true, // Reserve/Did Not Report
+		"R09": true, // Reserve/Commissioner Permission
+		"R48": true, // Reserve/Injured; DFR
+		
+		// Practice Squad injured
+		"P02": true, // Practice Squad; Injured
+		
+		// Active but injured/limited
+		"A02": true, // Active/Physically Unable to Perform
+		"A03": true, // Active/Non-Football Injury
+		"A04": true, // Active/Commissioner Exempt
+		"A07": true, // Active/Suspended
+		
+		// Waived
+		"W01": true, // Waived/Injured
+		"W03": true, // Waived/Injured; Settlement
+	}
+	
+	return injuryStatuses[statusAbbr]
 }
 
