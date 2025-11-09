@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -157,11 +158,23 @@ func (h *PlayerHandler) List(c *gin.Context) {
 	// Enrich players with stats (fast O(1) lookups!)
 	enrichedPlayers := make([]PlayerWithStats, 0, len(players))
 	for _, player := range players {
+		isCurrentPlayer := player.Season == 2025
+
+		// Determine status description
+		var statusDesc string
+		if !isCurrentPlayer {
+			// Player is retired (last season was before 2025)
+			statusDesc = fmt.Sprintf("Retired %d", player.Season)
+		} else {
+			// Active player - use their actual status
+			statusDesc = models.GetPlayerStatusDescription(player.Status, player.StatusDescriptionAbbr)
+		}
+
 		enriched := PlayerWithStats{
 			Player:            player,
-			IsCurrentPlayer:   player.Season == 2025,
+			IsCurrentPlayer:   isCurrentPlayer,
 			AvgEPA:            0,
-			StatusDescription: models.GetPlayerStatusDescription(player.Status, player.StatusDescriptionAbbr),
+			StatusDescription: statusDesc,
 		}
 
 		// O(1) lookup instead of N database queries!
